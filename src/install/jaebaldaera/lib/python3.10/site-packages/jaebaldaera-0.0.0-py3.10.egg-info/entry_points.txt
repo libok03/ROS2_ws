@@ -1,0 +1,4 @@
+[console_scripts]
+publisher_node = jaebaldaera.publisher_node:main
+subscriber_node = jaebaldaera.subscriber_node:main
+

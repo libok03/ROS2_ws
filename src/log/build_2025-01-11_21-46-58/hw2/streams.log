@@ -1,0 +1,38 @@
+[0.490s] Invoking command in '/home/libok/dev_ws/src/hw2': PYTHONPATH=/home/libok/dev_ws/src/build/hw2/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/libok/dev_ws/src/install/hw2/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/hw2 build --build-base /home/libok/dev_ws/src/build/hw2/build install --record /home/libok/dev_ws/src/build/hw2/install.log --single-version-externally-managed install_data
+[0.625s] running egg_info
+[0.625s] creating ../build/hw2/hw2.egg-info
+[0.625s] writing ../build/hw2/hw2.egg-info/PKG-INFO
+[0.625s] writing dependency_links to ../build/hw2/hw2.egg-info/dependency_links.txt
+[0.625s] writing entry points to ../build/hw2/hw2.egg-info/entry_points.txt
+[0.625s] writing requirements to ../build/hw2/hw2.egg-info/requires.txt
+[0.625s] writing top-level names to ../build/hw2/hw2.egg-info/top_level.txt
+[0.625s] writing manifest file '../build/hw2/hw2.egg-info/SOURCES.txt'
+[0.626s] reading manifest file '../build/hw2/hw2.egg-info/SOURCES.txt'
+[0.626s] writing manifest file '../build/hw2/hw2.egg-info/SOURCES.txt'
+[0.627s] running build
+[0.627s] running build_py
+[0.627s] creating /home/libok/dev_ws/src/build/hw2/build
+[0.627s] creating /home/libok/dev_ws/src/build/hw2/build/lib
+[0.627s] creating /home/libok/dev_ws/src/build/hw2/build/lib/hw2
+[0.627s] copying hw2/__init__.py -> /home/libok/dev_ws/src/build/hw2/build/lib/hw2
+[0.627s] copying hw2/pub_sub_test.py -> /home/libok/dev_ws/src/build/hw2/build/lib/hw2
+[0.627s] running install
+[0.627s] running install_lib
+[0.628s] creating /home/libok/dev_ws/src/install/hw2/lib/python3.10/site-packages/hw2
+[0.628s] copying /home/libok/dev_ws/src/build/hw2/build/lib/hw2/__init__.py -> /home/libok/dev_ws/src/install/hw2/lib/python3.10/site-packages/hw2
+[0.628s] copying /home/libok/dev_ws/src/build/hw2/build/lib/hw2/pub_sub_test.py -> /home/libok/dev_ws/src/install/hw2/lib/python3.10/site-packages/hw2
+[0.628s] byte-compiling /home/libok/dev_ws/src/install/hw2/lib/python3.10/site-packages/hw2/__init__.py to __init__.cpython-310.pyc
+[0.628s] byte-compiling /home/libok/dev_ws/src/install/hw2/lib/python3.10/site-packages/hw2/pub_sub_test.py to pub_sub_test.cpython-310.pyc
+[0.628s] running install_data
+[0.628s] creating /home/libok/dev_ws/src/install/hw2/share/ament_index
+[0.628s] creating /home/libok/dev_ws/src/install/hw2/share/ament_index/resource_index
+[0.629s] creating /home/libok/dev_ws/src/install/hw2/share/ament_index/resource_index/packages
+[0.629s] copying resource/hw2 -> /home/libok/dev_ws/src/install/hw2/share/ament_index/resource_index/packages
+[0.629s] copying package.xml -> /home/libok/dev_ws/src/install/hw2/share/hw2
+[0.629s] copying launch/hw2_launch.py -> /home/libok/dev_ws/src/install/hw2/share/hw2
+[0.629s] running install_egg_info
+[0.630s] Copying ../build/hw2/hw2.egg-info to /home/libok/dev_ws/src/install/hw2/lib/python3.10/site-packages/hw2-0.0.0-py3.10.egg-info
+[0.630s] running install_scripts
+[0.643s] Installing pub_sub_test script to /home/libok/dev_ws/src/install/hw2/lib/hw2
+[0.643s] writing list of installed files to '/home/libok/dev_ws/src/build/hw2/install.log'
+[0.660s] Invoked command in '/home/libok/dev_ws/src/hw2' returned '0': PYTHONPATH=/home/libok/dev_ws/src/build/hw2/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/libok/dev_ws/src/install/hw2/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/hw2 build --build-base /home/libok/dev_ws/src/build/hw2/build install --record /home/libok/dev_ws/src/build/hw2/install.log --single-version-externally-managed install_data

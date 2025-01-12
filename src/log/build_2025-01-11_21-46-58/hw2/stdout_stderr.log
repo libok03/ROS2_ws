@@ -1,0 +1,36 @@
+running egg_info
+creating ../build/hw2/hw2.egg-info
+writing ../build/hw2/hw2.egg-info/PKG-INFO
+writing dependency_links to ../build/hw2/hw2.egg-info/dependency_links.txt
+writing entry points to ../build/hw2/hw2.egg-info/entry_points.txt
+writing requirements to ../build/hw2/hw2.egg-info/requires.txt
+writing top-level names to ../build/hw2/hw2.egg-info/top_level.txt
+writing manifest file '../build/hw2/hw2.egg-info/SOURCES.txt'
+reading manifest file '../build/hw2/hw2.egg-info/SOURCES.txt'
+writing manifest file '../build/hw2/hw2.egg-info/SOURCES.txt'
+running build
+running build_py
+creating /home/libok/dev_ws/src/build/hw2/build
+creating /home/libok/dev_ws/src/build/hw2/build/lib
+creating /home/libok/dev_ws/src/build/hw2/build/lib/hw2
+copying hw2/__init__.py -> /home/libok/dev_ws/src/build/hw2/build/lib/hw2
+copying hw2/pub_sub_test.py -> /home/libok/dev_ws/src/build/hw2/build/lib/hw2
+running install
+running install_lib
+creating /home/libok/dev_ws/src/install/hw2/lib/python3.10/site-packages/hw2
+copying /home/libok/dev_ws/src/build/hw2/build/lib/hw2/__init__.py -> /home/libok/dev_ws/src/install/hw2/lib/python3.10/site-packages/hw2
+copying /home/libok/dev_ws/src/build/hw2/build/lib/hw2/pub_sub_test.py -> /home/libok/dev_ws/src/install/hw2/lib/python3.10/site-packages/hw2
+byte-compiling /home/libok/dev_ws/src/install/hw2/lib/python3.10/site-packages/hw2/__init__.py to __init__.cpython-310.pyc
+byte-compiling /home/libok/dev_ws/src/install/hw2/lib/python3.10/site-packages/hw2/pub_sub_test.py to pub_sub_test.cpython-310.pyc
+running install_data
+creating /home/libok/dev_ws/src/install/hw2/share/ament_index
+creating /home/libok/dev_ws/src/install/hw2/share/ament_index/resource_index
+creating /home/libok/dev_ws/src/install/hw2/share/ament_index/resource_index/packages
+copying resource/hw2 -> /home/libok/dev_ws/src/install/hw2/share/ament_index/resource_index/packages
+copying package.xml -> /home/libok/dev_ws/src/install/hw2/share/hw2
+copying launch/hw2_launch.py -> /home/libok/dev_ws/src/install/hw2/share/hw2
+running install_egg_info
+Copying ../build/hw2/hw2.egg-info to /home/libok/dev_ws/src/install/hw2/lib/python3.10/site-packages/hw2-0.0.0-py3.10.egg-info
+running install_scripts
+Installing pub_sub_test script to /home/libok/dev_ws/src/install/hw2/lib/hw2
+writing list of installed files to '/home/libok/dev_ws/src/build/hw2/install.log'
