@@ -1,6 +1,0 @@
-source;share/jaebaldaera/hook/pythonpath.ps1
-source;share/jaebaldaera/hook/pythonpath.dsv
-source;share/jaebaldaera/hook/pythonpath.sh
-source;share/jaebaldaera/hook/ament_prefix_path.ps1
-source;share/jaebaldaera/hook/ament_prefix_path.dsv
-source;share/jaebaldaera/hook/ament_prefix_path.sh

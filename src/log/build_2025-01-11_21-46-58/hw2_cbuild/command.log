@@ -1,2 +1,0 @@
-Invoking command in '/home/libok/dev_ws/src/build/hw2_cbuild': /usr/bin/cmake /home/libok/dev_ws/src/hw2_cbuild -DCMAKE_INSTALL_PREFIX=/home/libok/dev_ws/src/install/hw2_cbuild
-Invoked command in '/home/libok/dev_ws/src/build/hw2_cbuild' returned '1': /usr/bin/cmake /home/libok/dev_ws/src/hw2_cbuild -DCMAKE_INSTALL_PREFIX=/home/libok/dev_ws/src/install/hw2_cbuild

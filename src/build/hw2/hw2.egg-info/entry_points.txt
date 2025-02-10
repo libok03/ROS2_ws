@@ -1,3 +1,0 @@
-[console_scripts]
-pub_sub_test = hw2.pub_sub_test:main
-
