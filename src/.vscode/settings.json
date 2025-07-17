@@ -1,0 +1,7 @@
+{
+    "git.ignoreLimitWarning": true,
+    "files.associations": {
+        "functional": "cpp"
+    },
+    "cmake.sourceDirectory": "/home/libok/dev_ws/src/adaptive_clustering"
+}

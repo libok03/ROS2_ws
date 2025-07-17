@@ -1,0 +1,17 @@
+# ROS2 build artifacts
+build/
+install/
+log/
+
+# Workspace metadata
+.rosinstall
+.vscode/
+
+# Large files
+*.db3
+*.bag
+src/yolo/onnxruntime_gpu/lib/*.so
+
+# OS / IDE
+*.swp
+.DS_Store
