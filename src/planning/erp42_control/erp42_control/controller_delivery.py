@@ -14,7 +14,7 @@ from DB import DB
 from erp42_msgs.msg import ControlMessage
 from stanley import Stanley
 # YOLO 메시지 타입 (실제 타입으로 변경)
-from darknet_ros_msgs.msg import BoundingBoxes, BoundingBox
+# from darknet_ros_msgs.msg import BoundingBoxes, BoundingBox
 
 
 class SpeedSupporter:
@@ -58,12 +58,12 @@ class Delivery:
         self.node = node
 
         # YOLO 구독자: BoundingBoxes 메시지 받아 callback_yolo 호출
-        self.yolo_sub = self.node.create_subscription(
-            ???,
-            "/darknet_ros/bounding_boxes",
-            self.callback_yolo,
-            qos_profile_system_default
-        )
+        # self.yolo_sub = self.node.create_subscription(
+        #     ???,
+        #     "/darknet_ros/bounding_boxes",
+        #     self.callback_yolo,
+        #     qos_profile_system_default
+        # )
 
         # 경로 퍼블리셔
         self.delivery_path_pub = node.create_publisher(
@@ -103,11 +103,11 @@ class Delivery:
         self.estop_start_time  = None
         self.target_idx        = 0
 
-    def callback_yolo(self, msg):
-        """YOLO 콜백: 첫 번째 person 박스 중심을 place_x/place_y에 저장"""
-        if self.abs_var:
-            if msg.class_id == self.abs_var:
-                self.place_x, self.place_y = msg.x,msg.y
+    # def callback_yolo(self, msg):
+    #     """YOLO 콜백: 첫 번째 person 박스 중심을 place_x/place_y에 저장"""
+    #     if self.abs_var:
+    #         if msg.class_id == self.abs_var:
+    #             self.place_x, self.place_y = msg.x,msg.y
         
 
     def rotate_points(self, points: np.ndarray, angle: float, origin: np.ndarray) -> np.ndarray:
@@ -166,6 +166,8 @@ class Delivery:
         self.node.get_logger().info("경로 퍼블리시 완료.")
 
     def control_delivery(self, odometry, abs_var):
+        self.place_x, self.place_y= 11.0 , 15.0
+        
         # odometry 갱신
         self.x, self.y, self.yaw = odometry.x, odometry.y, odometry.yaw
         self.abs_var = abs_var
