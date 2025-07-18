@@ -14,7 +14,7 @@ from DB import DB
 from erp42_msgs.msg import ControlMessage
 from stanley import Stanley
 # YOLO 메시지 타입 (실제 타입으로 변경)
-# from darknet_ros_msgs.msg import BoundingBoxes, BoundingBox
+# from custom_msgs.msg import BoundingBoxes, BoundingBox
 
 
 class SpeedSupporter:
@@ -58,12 +58,12 @@ class Delivery:
         self.node = node
 
         # YOLO 구독자: BoundingBoxes 메시지 받아 callback_yolo 호출
-        # self.yolo_sub = self.node.create_subscription(
-        #     ???,
-        #     "/darknet_ros/bounding_boxes",
-        #     self.callback_yolo,
-        #     qos_profile_system_default
-        # )
+        self.yolo_sub = self.node.create_subscription(
+            BoundingBoxes,
+            "/darknet_ros/bounding_boxes",
+            self.callback_yolo,
+            qos_profile_system_default
+        )
 
         # 경로 퍼블리셔
         self.delivery_path_pub = node.create_publisher(
@@ -104,10 +104,31 @@ class Delivery:
         self.target_idx        = 0
 
     # def callback_yolo(self, msg):
-    #     """YOLO 콜백: 첫 번째 person 박스 중심을 place_x/place_y에 저장"""
-    #     if self.abs_var:
-    #         if msg.class_id == self.abs_var:
-    #             self.place_x, self.place_y = msg.x,msg.y
+    #     """
+    #     YOLO 콜백: abs_var에 해당하는 첫 번째 박스를 찾아 중심좌표 저장
+    #     - 오인식 방지를 위해 confidence(신뢰도)도 사용해서 0.5 이상만 인식하도록 함
+    #     """
+    #     if not self.abs_var:
+    #         return
+
+    #     best_bb = None
+    #     best_conf = 0.0
+
+    #     # abs_var에 해당하는 박스 중에서 confidence가 가장 높은 것 선택
+    #     for bb in msg.boxes:
+    #         if bb.class_name == self.abs_var and bb.confidence > 0.5:
+    #             if bb.confidence > best_conf:
+    #                 best_bb = bb
+    #                 best_conf = bb.confidence
+
+    #     if best_bb:
+    #         self.place_x = (best_bb.xmin + best_bb.xmax) / 2
+    #         self.place_y = (best_bb.ymin + best_bb.ymax) / 2
+    #         # 필요하면 time stamp 등도 같이 기록 가능
+    #     else:
+    #         # abs_var에 해당하는 박스가 없거나 신뢰도가 낮은 경우는 무시
+    #         pass
+
         
 
     def rotate_points(self, points: np.ndarray, angle: float, origin: np.ndarray) -> np.ndarray:
@@ -166,7 +187,8 @@ class Delivery:
         self.node.get_logger().info("경로 퍼블리시 완료.")
 
     def control_delivery(self, odometry, abs_var):
-        self.place_x, self.place_y= 11.0 , 15.0
+        #테스트 코드
+        # self.place_x, self.place_y= 11.0 , 15.0
         
         # odometry 갱신
         self.x, self.y, self.yaw = odometry.x, odometry.y, odometry.yaw
