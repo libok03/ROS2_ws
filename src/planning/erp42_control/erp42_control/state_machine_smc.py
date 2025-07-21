@@ -74,34 +74,75 @@ def quaternion_from_euler(roll, pitch, yaw):
     return qx, qy, qz, qw
 
 
-
-
-class PID():
+class SMC:
     def __init__(self, node):
-        self.node = node
-        self.p_gain = node.declare_parameter("/stanley_controller/p_gain", 2.07).value
-        self.i_gain = node.declare_parameter("/stanley_controller/i_gain", 0.85).value
-       
-        self.p_err = 0.0
-        self.i_err = 0.0
-        self.speed = 0.0
-        
-        self.current = node.get_clock().now().seconds_nanoseconds()[0] + (node.get_clock().now().seconds_nanoseconds()[1] / 1e9)
-        self.last = node.get_clock().now().seconds_nanoseconds()[0] + (node.get_clock().now().seconds_nanoseconds()[1] / 1e9)
-    def PIDControl(self, speed, desired_value, min, max):
+        """
+        SMC 제어 클래스 (입출력 단위: km/h)
 
-        self.current = self.node.get_clock().now().seconds_nanoseconds()[0] + (self.node.get_clock().now().seconds_nanoseconds()[1] / 1e9)
-        dt = self.current - self.last
+        ROS2 노드를 받아 파라미터를 선언 및 초기 설정합니다.
+        """
+        self.node = node
+
+        # 슬라이딩 모드 제어 이득
+        self.lambda_gain = 3.0
+        self.k_gain = 5.0
+        self.tol =  1.0
+
+        # 내부 상태 변수
+        self.prev_error = 0.0
+
+        # ROS2 시간 초기화
+        now = node.get_clock().now().seconds_nanoseconds()
+        self.current = now[0] + now[1] / 1e9
         self.last = self.current
 
-        err = desired_value - speed
-        # self.d_err = (err - self.p_err) / dt 
-        self.p_err = err
-        # print(speed)
-        self.i_err += self.p_err * dt  * (0.0 if speed == 0 else 1.0)
+    def saturation(self, s):
+        """포화 함수: [-1, 1]로 제한"""
+        return max(min(s / self.tol, 1.0), -1.0)
 
-        self.speed = speed + (self.p_gain * self.p_err) + (self.i_gain * self.i_err)
-        return int(np.clip(self.speed, min, max))
+    def SMCControl(self, current_speed_kph, desired_speed_kph, min, max):
+        """
+        SMC 제어 입력 계산 함수 (단위: km/h)
+
+        입력:
+        - current_speed_kph: 현재 속도 (km/h)
+        - desired_speed_kph: 목표 속도 (km/h)
+        - min_kph: 제어 출력 최소 범위 (km/h)
+        - max_kph: 제어 출력 최대 범위 (km/h)
+
+        반환:
+        - new_speed_kph: SMC 제어 후 출력 속도 (km/h)
+        """
+        # ROS 시간 계산
+        dt = 0.1
+        self.last = self.current
+        if dt <= 0.0:
+            dt = 1e-5
+
+        # 단위 변환: km/h → m/s
+        current_speed_mps = current_speed_kph / 3.6
+        desired_speed_mps = desired_speed_kph / 3.6
+
+        # 오차 + 슬라이딩면 계산
+        error = desired_speed_mps - current_speed_mps
+        error_dot = (error - self.prev_error) / dt
+        self.prev_error = error
+        s = error_dot + self.lambda_gain * error
+
+        # 슬라이딩 모드 제어 신호 계산
+        u = self.lambda_gain * error_dot + self.k_gain * self.saturation(s)
+
+        # 업데이트된 속도 계산
+        new_speed_mps = current_speed_mps + u * dt
+        
+        # m/s → km/h로 다시 변환 후, 출력 제한 적용
+        new_speed_kph = new_speed_mps * 3.6
+        new_speed_kph = np.clip(new_speed_kph, min, max)
+        print(f"curr={current_speed_kph:.2f}  target={desired_speed_kph:.2f}  error={error:.2f}  error_dot={error_dot:.2f}  s={s:.2f}  sat(s)={self.saturation(s):.2f}  u={u:.2f}  next={new_speed_kph:.2f}")
+
+
+        return int(new_speed_kph)
+
     
 class SpeedSupporter():
     def __init__(self, node):
@@ -133,17 +174,13 @@ class SpeedSupporter():
 
 class State(Enum):    
 #kcity 본선 대회용 (final - 1012)
-
-    A1A2 = "driving_a"  # 13
-    A2A3 = "driving_b"  # 9
-    A3A4 = "driving_c"  # 8
-    A4A5 = "driving_d"  # 8
-    A5A6 = "driving_e"  # 6
-    A6A7 = "driving_f"  # 8
-    A7A8 = "driving_g"  # 8
-    A8A9 = "driving_s"  # 8
-    A9A10 = "driving_h"  # 8
-    # A1A2 = "delivery_a"  #13
+    A1A2 = "driving_a"  #13
+    A2A3 = "driving_b"
+    A3A4 = "driving_c"
+    A4A5 = "driving_d"
+    A5A6 = "driving_e"
+    A6A7 = "driving_f"
+    A7A8 = "driving_g"
     # A2A3 = "pickup_b"  #9
     # A3A4 = "curve_c"  #8
     # A4A5 = "curve_d"  #8
@@ -253,7 +290,7 @@ class StateMachine():
         self.odometry = odometry
 
         self.st = Stanley()
-        self.pid = PID(node)
+        self.smc = SMC(node)
         self.ss = SpeedSupporter(node)
 
         self.target_idx = 0
@@ -308,8 +345,8 @@ class StateMachine():
             if self.odometry.x != 0.: #10.03 수정
                 steer, self.target_idx, hdr, ctr = self.st.stanley_control(self.odometry, self.path.cx, self.path.cy, self.path.cyaw, h_gain=1.0, c_gain=1.0)
                 target_speed = self.set_target_speed()
-                adapted_speed = self.ss.adaptSpeed(target_speed, hdr, ctr, min_value=5, max_value=15) # 에러(hdr, ctr) 기반 목표 속력 조정
-                speed = self.pid.PIDControl(self.odometry.v * 3.6, adapted_speed, min=5, max=15) # speed 조정 (PI control) 
+                adapted_speed = self.ss.adaptSpeed(target_speed,hdr,ctr,min_value= 5,max_value=15)
+                speed = self.smc.SMCControl(self.odometry.v * 3.6, adapted_speed, min=0, max=15) # speed 조정 (PI control) 
                 brake = self.cacluate_brake(adapted_speed) # brake 조정
 
                 # msg.speed = int(adapted_speed) * 10
@@ -325,7 +362,7 @@ class StateMachine():
                 steer, self.target_idx, hdr, ctr = self.st.stanley_control(self.odometry, self.path.cx, self.path.cy, self.path.cyaw, h_gain=1.0, c_gain=1.0)
                 target_speed = self.set_target_speed()
                 adapted_speed = self.ss.adaptSpeed(target_speed, hdr, ctr, min_value=4, max_value=10) # 에러(hdr, ctr) 기반 목표 속력 조정
-                speed = self.pid.PIDControl(self.odometry.v * 3.6, adapted_speed,  min=4, max=10) # speed 조정 (PI control) 
+                speed = self.smc.SMCControl(self.odometry.v * 3.6, adapted_speed,  min=4, max=10) # speed 조정 (PI control) 
                 brake = self.cacluate_brake(adapted_speed) # brake 조정
 
                 # msg.speed = int(adapted_speed) * 10

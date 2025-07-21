@@ -78,10 +78,10 @@ def quaternion_from_euler(roll, pitch, yaw):
 class PID:
     def __init__(self, node):
         self.node = node
-        self.p_gain = node.declare_parameter("/stanley_controller/p_gain", 2.07).value
-        self.i_gain = node.declare_parameter("/stanley_controller/i_gain", 0.85).value
-        # self.p_gain = node.declare_parameter("/stanley_controller/p_gain", 1.0).value
-        # self.i_gain = node.declare_parameter("/stanley_controller/i_gain", 0.05).value
+        # self.p_gain = node.declare_parameter("/stanley_controller/p_gain", 2.07).value
+        # self.i_gain = node.declare_parameter("/stanley_controller/i_gain", 0.85).value
+        self.p_gain = 2.07
+        self.i_gain = 0.05
 
         self.p_err = 0.0
         self.i_err = 0.0

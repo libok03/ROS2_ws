@@ -15,13 +15,11 @@ import sqlite3
 import matplotlib.pyplot as plt
 import mpld3  # for interactive HTML export
 
-
 def quaternion_to_yaw(qx: float, qy: float, qz: float, qw: float) -> float:
     """Convert quaternion to yaw angle around Z axis."""
     siny = 2.0 * (qw * qz + qx * qy)
     cosy = 1.0 - 2.0 * (qy * qy + qz * qz)
     return np.arctan2(siny, cosy)
-
 
 class BagfileAnalyzer(Node):
     def __init__(self, db_path: str):
@@ -46,6 +44,11 @@ class BagfileAnalyzer(Node):
         self.speed = []
         self.err_xy = []
         self.err_yaw = []
+
+        # --- 추가: 이전 위치/시간 저장용 변수
+        self.last_x = None
+        self.last_y = None
+        self.last_t = None
 
         # Prepare figure 3x2
         plt.ion()
@@ -93,9 +96,23 @@ class BagfileAnalyzer(Node):
         y = msg.pose.pose.position.y
         q = msg.pose.pose.orientation
         yaw = quaternion_to_yaw(q.x, q.y, q.z, q.w)
-        vx = msg.twist.twist.linear.x
-        vy = msg.twist.twist.linear.y
-        spd = float(np.hypot(vx, vy))
+
+        # --- 위치 변화 기반 속도계산 ---
+        if self.last_x is not None and self.last_t is not None:
+            dx = x - self.last_x
+            dy = y - self.last_y
+            dt = t - self.last_t
+            if dt > 0.0:
+                spd = float(np.hypot(dx, dy) / dt)
+            else:
+                spd = 0.0
+        else:
+            spd = 0.0
+
+        self.last_x = x
+        self.last_y = y
+        self.last_t = t
+        # -----------------------------
 
         # Store live data
         self.ts.append(t)
@@ -132,7 +149,7 @@ class BagfileAnalyzer(Node):
         for ax in self.axs.flatten():
             ax.cla()
 
-                                # 1) Lap time per path_id (wrapped into 3 rows)
+        # 1) Lap time per path_id (wrapped into 3 rows)
         ax = self.axs[0, 0]
         ax.axis('off')
         if self.lap_times:
@@ -149,7 +166,7 @@ class BagfileAnalyzer(Node):
             ax.text(0.02, 0.95, text_str, transform=ax.transAxes, va='top', ha='left', fontsize=10)
         else:
             ax.text(0.5, 0.5, 'No laps yet', ha='center', va='center', transform=ax.transAxes)
-        # 2) Trajectory colored by speed Trajectory colored by speed
+        # 2) Trajectory colored by speed
         ax = self.axs[0, 1]
         sc2 = ax.scatter(self.x, self.y, c=self.speed, s=8)
         ax.set_title('Trajectory (speed)')
@@ -210,10 +227,9 @@ class BagfileAnalyzer(Node):
         self.fig.tight_layout()
         plt.pause(0.001)
 
-
 def main():
     parser = argparse.ArgumentParser(description='Bagfile Analyzer')
-    parser.add_argument('--db', '-d', default='/home/libok/db_file/BS_final.db', help='SQLite DB path')
+    parser.add_argument('--db', '-d', default='/home/libok/db_file/YS_final.db', help='SQLite DB path')
     args = parser.parse_args()
 
     rclpy.init()
