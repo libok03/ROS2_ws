@@ -6,7 +6,7 @@ import numpy as np
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_system_default
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Pose
 from nav_msgs.msg import Path
 from tf_transformations import quaternion_from_euler
 
@@ -59,8 +59,8 @@ class Delivery:
 
         # YOLO 구독자: BoundingBoxes 메시지 받아 callback_yolo 호출
         self.yolo_sub = self.node.create_subscription(
-            BoundingBoxes,
-            "/darknet_ros/bounding_boxes",
+            Pose,
+            "/traffic_sign",
             self.callback_yolo,
             qos_profile_system_default
         )
@@ -85,10 +85,10 @@ class Delivery:
         self.x = self.y = self.yaw = 0.0
 
         # 목표 위치: None이면 아직 YOLO 미검출
-        # self.place_x = None
-        # self.place_y = None
-        self.place_x = 11.0
-        self.place_y = 15.0
+        self.place_x = None
+        self.place_y = None
+        # self.place_x = 11.0
+        # self.place_y = 15.0
 
         # 변환된 경로 저장
         self.current_path = None
@@ -103,31 +103,31 @@ class Delivery:
         self.estop_start_time  = None
         self.target_idx        = 0
 
-    # def callback_yolo(self, msg):
-    #     """
-    #     YOLO 콜백: abs_var에 해당하는 첫 번째 박스를 찾아 중심좌표 저장
-    #     - 오인식 방지를 위해 confidence(신뢰도)도 사용해서 0.5 이상만 인식하도록 함
-    #     """
-    #     if not self.abs_var:
-    #         return
+    def callback_yolo(self, msg):
+        """
+        YOLO 콜백: abs_var에 해당하는 첫 번째 박스를 찾아 중심좌표 저장
+        - 오인식 방지를 위해 confidence(신뢰도)도 사용해서 0.5 이상만 인식하도록 함
+        """
+        if not self.abs_var:
+            return
 
-    #     best_bb = None
-    #     best_conf = 0.0
+        best_bb = None
+        best_conf = 0.0
 
-    #     # abs_var에 해당하는 박스 중에서 confidence가 가장 높은 것 선택
-    #     for bb in msg.boxes:
-    #         if bb.class_name == self.abs_var and bb.confidence > 0.5:
-    #             if bb.confidence > best_conf:
-    #                 best_bb = bb
-    #                 best_conf = bb.confidence
+        # abs_var에 해당하는 박스 중에서 confidence가 가장 높은 것 선택
+        for bb in msg.boxes:
+            if bb.class_name == self.abs_var and bb.confidence > 0.5:
+                if bb.confidence > best_conf:
+                    best_bb = bb
+                    best_conf = bb.confidence
 
-    #     if best_bb:
-    #         self.place_x = (best_bb.xmin + best_bb.xmax) / 2
-    #         self.place_y = (best_bb.ymin + best_bb.ymax) / 2
-    #         # 필요하면 time stamp 등도 같이 기록 가능
-    #     else:
-    #         # abs_var에 해당하는 박스가 없거나 신뢰도가 낮은 경우는 무시
-    #         pass
+        if best_bb:
+            self.place_x = (best_bb.xmin + best_bb.xmax) / 2
+            self.place_y = (best_bb.ymin + best_bb.ymax) / 2
+            # 필요하면 time stamp 등도 같이 기록 가능
+        else:
+            # abs_var에 해당하는 박스가 없거나 신뢰도가 낮은 경우는 무시
+            pass
 
         
 
