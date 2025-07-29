@@ -1,19 +1,19 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3 -u
 # -*- coding: utf-8 -*-
 import math
 import numpy as np
 
 class DWAConfig:
     """DWA 기본 파라미터 설정"""
-    max_speed = 2.0            # [m/s]
+    max_speed = 15.0            # [m/s]
     min_speed = -0.5           # [m/s]
     max_yaw_rate = math.radians(28.0)    # [rad/s]
-    max_accel = 0.2            # [m/s^2]
-    max_delta_yaw_rate = math.radians(40.0)  # [rad/s^2]
+    max_accel = 0.5            # [m/s^2]
+    max_delta_yaw_rate = math.radians(28.0)  # [rad/s^2]
     v_resolution = 0.01        # [m/s]
     yaw_rate_resolution = math.radians(1.0)  # [rad/s]
-    dt = 0.1                   # [s] 예측 시간 간격
-    predict_time = 2.0         # [s] 예측 시간
+    dt = 0.5                   # [s] 예측 시간 간격
+    predict_time = 3.0         # [s] 예측 시간
     to_goal_cost_gain = 0.15
     speed_cost_gain = 1.0
     obstacle_cost_gain = 1.0
@@ -22,7 +22,7 @@ class DWAPlanner:
     def __init__(self, config=None):
         self.cfg = config or DWAConfig()
 
-    def plan(self, obstacles, x, y, yaw, v=0.0):
+    def plan(self, obstacles, x, y, yaw, v):
         """
         장애물 리스트와 현재 상태를 받아 최적 궤적을 반환
         :param obstacles: [[ox1, oy1], [ox2, oy2], ...]
@@ -57,22 +57,25 @@ class DWAPlanner:
                     min_cost = cost
                     best_u = [vv, y_rate]
                     best_traj = traj
-
+        if min_cost == float('inf') or len(best_traj) < 2:  
+            # 장애물 유무와 상관없이 최소 직진 궤적 보장
+            best_traj = self._predict_trajectory(
+                [0.0, 0.0, yaw, v],
+                [v, 0.0]
+            )
         return best_traj
 
     def _calc_dynamic_window(self, state):
-        """현재 상태에서 허용 가능한 속도·yaw_rate 범위 계산"""
         cfg = self.cfg
-        Vs = [cfg.min_speed, cfg.max_speed,
-              -cfg.max_yaw_rate, cfg.max_yaw_rate]
-        Vd = [state[3] - cfg.max_accel * cfg.dt,
-              state[3] + cfg.max_accel * cfg.dt,
-              state[3] - cfg.max_delta_yaw_rate * cfg.dt,
-              state[3] + cfg.max_delta_yaw_rate * cfg.dt]
-        return [
-            max(Vs[0], Vd[0]), min(Vs[1], Vd[1]),
-            max(Vs[2], Vd[2]), min(Vs[3], Vd[3])
-        ]
+        v = state[3]
+        # 속도 범위
+        v_min = max(cfg.min_speed, v - cfg.max_accel * cfg.dt)
+        v_max = min(cfg.max_speed, v + cfg.max_accel * cfg.dt)
+        # yaw_rate 범위: 매번 ±max_yaw_rate 전 범위로
+        yr_min = -cfg.max_yaw_rate
+        yr_max =  cfg.max_yaw_rate
+        return [v_min, v_max, yr_min, yr_max]
+
 
     def _predict_trajectory(self, state, u):
         """주어진 제어 입력 u=[v, yaw_rate]로 궤적 예측"""

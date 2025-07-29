@@ -40,16 +40,9 @@ def generate_launch_description():
             # parking_hybrid_astar파일 실행
             Node(
                 package="no_gps_path",
-                executable="costmap_publisher",
-                name= "costmap_publisher",
-                output = "screen"
-            ),
-            # parking_hybrid_astar파일 실행
-            Node(
-                package="no_gps_path",
                 executable="dwa_publisher",
                 name= "dwa_publisher",
                 output = "screen"
-            )
+            ),
         ]
     )

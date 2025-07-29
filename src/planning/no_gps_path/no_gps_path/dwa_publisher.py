@@ -38,16 +38,20 @@ class DWAPlannerNode(Node):
         self.timer = self.create_timer(0.1, self.timer_callback)
 
     def obstacle_callback(self, msg: PoseArray):
-        # base_link 기준, (0,0)에 상대적인 cone 위치들
-        self.obstacles = [
-            [pose.position.x, pose.position.y]
-            for pose in msg.poses
-        ]
+        thresh = 0.1  # [m]
+        self.obstacles = []
+        for pose in msg.poses:
+            dx = pose.position.x
+            dy = pose.position.y
+            if math.hypot(dx, dy) > thresh:
+                self.obstacles.append([dx, dy])
+        self.get_logger().debug(f'obstacles filtered: {len(self.obstacles)} points')
+
 
     def feedback_callback(self, msg: SerialFeedBack):
         # speed 필드는 uint16 (cm/s 등)로 넘어올 수 있으니 단위 변환이 필요하면 조정
-        # 여기서는 msg.speed / 100.0 -> m/s 라고 가정
-        self.current_v = msg.speed / 100.0
+        # 여기서는 msg.speed -> m/s 라고 가정
+        self.current_v = msg.speed
 
     def timer_callback(self):
         # 현재 (x,y) = (0,0), yaw=0 으로 가정
@@ -58,6 +62,9 @@ class DWAPlannerNode(Node):
             v=self.current_v
         )
 
+        if len(best_traj) < 2:
+            self.get_logger().warn("no DWA_route found")
+            return
         # best_traj[0] 은 현재 state, best_traj[1] 의 v와 yaw 차이로 u 추정
         # dt = self.planner.cfg.dt 만큼의 예측이니까
         next_state = best_traj[1]
@@ -70,9 +77,9 @@ class DWAPlannerNode(Node):
         cmd.mora = 0            # 예: 고정값
         cmd.estop = 0
         cmd.gear = 2            # 2: 전진
-        cmd.speed = int(target_v) * 10
-        max_yaw = self.planner.cfg.max_yaw_rate
-        cmd.steer = int(max(-28,min(28,(yaw_rate / max_yaw) * 28.0)))
+        cmd.speed = int(target_v*3.6) * 10
+        raw_steer = (yaw_rate / self.planner.cfg.max_yaw_rate) * 28.0
+        cmd.steer  = int(max(-28, min(28, raw_steer)))
         cmd.brake = 0
         cmd.alive = 1
 
