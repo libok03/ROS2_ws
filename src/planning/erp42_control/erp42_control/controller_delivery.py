@@ -9,6 +9,7 @@ from rclpy.qos import qos_profile_system_default
 from geometry_msgs.msg import PoseStamped, Pose
 from nav_msgs.msg import Path
 from tf_transformations import quaternion_from_euler
+from yolo_msg.msg import TrafficSign
 
 from DB import DB
 from erp42_msgs.msg import ControlMessage
@@ -59,8 +60,8 @@ class Delivery:
 
         # YOLO 구독자: BoundingBoxes 메시지 받아 callback_yolo 호출
         self.yolo_sub = self.node.create_subscription(
-            Pose,
-            "/traffic_sign",
+            TrafficSign,
+            "/traffic_sign_map",
             self.callback_yolo,
             qos_profile_system_default
         )
@@ -97,6 +98,7 @@ class Delivery:
         # 퍼블리시 플래그
         self.published_search   = False
         self.published_delivery = False
+        self.find_sign = False
 
         # 배달 제어 플래그
         self.first_try         = True
@@ -111,23 +113,12 @@ class Delivery:
         if not self.abs_var:
             return
 
-        best_bb = None
-        best_conf = 0.0
-
         # abs_var에 해당하는 박스 중에서 confidence가 가장 높은 것 선택
-        for bb in msg.boxes:
-            if bb.class_name == self.abs_var and bb.confidence > 0.5:
-                if bb.confidence > best_conf:
-                    best_bb = bb
-                    best_conf = bb.confidence
-
-        if best_bb:
-            self.place_x = (best_bb.xmin + best_bb.xmax) / 2
-            self.place_y = (best_bb.ymin + best_bb.ymax) / 2
-            # 필요하면 time stamp 등도 같이 기록 가능
-        else:
-            # abs_var에 해당하는 박스가 없거나 신뢰도가 낮은 경우는 무시
-            pass
+        if msg.class_id == self.abs_var:
+            self.place_x = msg.pose.position.x
+            self.place_y = msg.pose.position.y
+            self.find_sign = True
+            
 
         
 
