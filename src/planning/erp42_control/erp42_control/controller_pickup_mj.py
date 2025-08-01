@@ -82,26 +82,26 @@ class Pickup():
         self.st = Stanley()
         self.pid = PID(node)
         self.ss = SpeedSupporter(node)
-        
-        
+
+
         self.yolo_sub = self.node.create_subscription(
-            TrafficSign, #??
-            "/traffic_sign_map", #?? 뭘까요
+            TrafficSign,
+            "/traffic_sign_map",
             self.yolo_callback,
             10
         )
-        
+
 
 
         self.estop = 0
         self.target_speed = 6
         self.count = 0
         self.queue = []
-        self.abs_var = None  # "abs1", "abs2", "abs3" 중 하나로 설정될 예정
-        
+        self.abs_var = None  # abs_var A1, A2, A3으로 들어왔기 때문에, +3 해서 들어와 B1, B2, B3과 맞춰줌 
+
     def yolo_callback(self, msg):
         if msg.class_id in (1,2,3):
-            self.queue.append(msg.class_name)
+            self.queue.append(msg.class_id)
         if len(self.queue) > 10:
             self.queue.pop(0)
         # 3) 가장 많이 검출된 클래스가 6번 이상이면 abs_var 설정
@@ -118,15 +118,15 @@ class Pickup():
         msg = ControlMessage()
 
         steer, self.target_idx, hdr, ctr = self.st.stanley_control(odometry, path.cx, path.cy, path.cyaw, h_gain=0.6, c_gain=0.35)
-        self.get_logger().info(self.target_idx)
+        # self.get_logger().info(self.target_idx)
 
         if self.target_idx >= len(path.cx) - 2 : # distance가 0.5m 이내
-            self.get_logger().info(self.target_idx, len(path.cx), self.count)
+            # self.get_logger().info(self.target_idx, len(path.cx), self.count)
             if self.count <= 50:
                 self.estop = 1
                 self.count += 1
                 if self.abs_var is not None:
-                    self.node.get_logger().info(f"Pickup: {self.abs_var} detected, estop engaged.")
+                    print(f"Pickup: {self.abs_var} detected, estop engaged.")
             else:
                 self.estop = 0
                 self.pickup_finished = True
