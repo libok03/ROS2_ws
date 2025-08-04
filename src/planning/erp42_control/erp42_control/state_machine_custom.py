@@ -297,7 +297,7 @@ class StateMachine():
             msg, self.abs_var, self.mission_finish = self.pickup.control_pickup(self.odometry, self.path)
         
         elif self.state.value[:-2] == "delivery":
-            msg, self.mission_finish = self.delivery.control_delivery(self.odometry, self.abs_var, self.path)  # abs_var 설정, B1은 예시로 사용됨
+            msg, self.mission_finish = self.delivery.control_delivery(self.odometry, self.abs_var, self.path)  # abs_var 설정, A1 = 1, A2 = 2, A3 = 3, B1 = 4, B2 = 5, B3 = 6 으로 픽업에서 들어오는값의 +3으로 계산되어 나옴
 
         # elif self.state.value[:-2] == "traffic_light":
         #     msg, self.mission_finish = self.traffic_light.control_traffic_light(self.odometry, self.path)

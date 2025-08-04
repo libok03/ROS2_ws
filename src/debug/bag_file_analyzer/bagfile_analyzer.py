@@ -329,7 +329,7 @@ class BagfileAnalyzer(Node):
 
 def main():
     parser = argparse.ArgumentParser(description='Bagfile Analyzer')
-    parser.add_argument('--db', '-d', default='/home/libok/db_file/bunsudae_v1.db', help='SQLite DB path')
+    parser.add_argument('--db', '-d', default='/home/libok/db_file/k_city_ys_v1.db', help='SQLite DB path')
     args = parser.parse_args()
 
     rclpy.init()

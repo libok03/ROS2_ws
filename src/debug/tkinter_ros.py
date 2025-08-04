@@ -7,7 +7,7 @@ import signal
 import psutil
 
 # 환경설정
-WORKSPACE_PATH = "/home/libok/dev_ws"
+WORKSPACE_PATH = "/home/libok/ROS2_ws"
 SETUP_BASH = os.path.join(WORKSPACE_PATH, "install/setup.bash")
 
 TERMINAL_CONFIGS = [

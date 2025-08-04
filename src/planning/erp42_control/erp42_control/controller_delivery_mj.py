@@ -49,7 +49,7 @@ class Delivery:
         # 제어 파라미터
         self.v_search = 5.0          # 추종 속도(프로젝트 스펙 단위에 맞게 조정)
         self.max_steer_deg = 28.0     # 조향 제한(deg)
-        self.stop_radius = 1.0        # [m] sign까지 거리 임계값 (1 m 내면 즉시 정지)
+        self.stop_radius = 3.0        # [m] sign까지 거리 임계값 (1 m 내면 즉시 정지)
 
         # 내부
         self.current_path = None      # (xs, ys, yaws)
