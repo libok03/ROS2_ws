@@ -6,6 +6,7 @@ log/
 # Workspace metadata
 .rosinstall
 .vscode/
+__pycache__
 
 # Large files
 *.db3
