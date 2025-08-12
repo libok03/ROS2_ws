@@ -16,12 +16,12 @@ from enum import Enum
 import threading
 
 
-# from controller_obstacle import Obstacle
+from controller_obstacle import Obstacle
 from controller_pickup_mj import Pickup
 from controller_delivery_mj import Delivery
-# from controller_parking import Pakring
-# # from controller_traffic_light import Trafficlight
-# from controller_stop_line import Stopline
+from controller_parking import Pakring
+from controller_traffic_light import Trafficlight
+from controller_stop_line import Stopline
 
 from Modifier_param import set_param
 
@@ -134,19 +134,45 @@ class SpeedSupporter():
 class State(Enum):    
 #kcity 본선 대회용 (final - 1012)
 
-    A1A2 = "driving_a"     # 13
-    A2A3 = "pickup_b"      # 8
-    A3A4 = "curve_c"       # 8
-    A4A5 = "driving_d"     # 13
-    A5A6 = "driving_e"   # 8
-    A6A7 = "driving_f"     # 13
-    A7A8 = "curve_g"       # 8
-    A8A9 = "driving_h"     # 13
-    A9A10 = "delivery_i"   # 8
-    A10A11 = "curve_j"     # 8
-    # A11A12 = "driving_k"   # 13
-    A11A12 = "driving_l"   # 8
-    A12A13 = "driving_m"   # 13
+    A1A2 = "driving_a"
+    A2A3 = "pickup_b"
+    A3A4 = "curve_c"
+    A4A5 = "traffic_light_d"
+    # A4A5 = "driving_d"
+    A5A6 = "driving_e"
+    A6A7 = "traffic_light_f"
+    # A6A7 = "driving_f"
+    A7A8 = "driving_g"
+    A8A9 = "obstacle_h"
+    A9A10 = "curve_i"
+    A10A11 = "Traffic_light_j"
+    # A10A11 = "driving_j"
+    A11A12 = "driving_k"
+    A12A13 = "stop_line_l"
+    A13A14 = "stop_line_m"
+    A14A15 = "driving_o"
+    A15A16 = "curve_p"
+    A16A17 = "driving_q"
+    A17A18 = "traffic_light_r"
+    # A17A18 = "driving_r"
+    A18A19 = "driving_s"
+    A19A20 = "curve_t"
+    A20A21 = "delivery_u"
+    A21A22 = "traffic_light_v"
+    # A21A22 = "driving_v"
+    A22A23 = "driving_w"
+    A23A24 = "traffic_light_x"
+    # A23A24 = "driving_x"
+    A24A25 = "driving_y"
+    A25A26 = "curve_z"
+    A26A27 = "obstacle_A"
+    A27A28 = "curve_B"
+    A28A29 = "driving_C"
+    A29A30 = "parking_D"
+    A30A31 = "driving_E"
+    
+    
+    
 
 class GetPath():
     def __init__(self, db, init_state):
@@ -201,14 +227,15 @@ class StateMachine():
         self.current_idx = 0
         self.idx_len = 0
         self.mission_finish = False
+        self.abs_var = None
 
 
-        # self.obstacle = Obstacle(self.node)
+        self.obstacle = Obstacle(self.node)
         self.pickup = Pickup(self.node)
         self.delivery = Delivery(self.node)
-        # self.parking = Pakring(self.node)
-        # # self.traffic_light = Trafficlight(self.node)
-        # self.stop_line = Stopline(self.node)
+        self.parking = Pakring(self.node)
+        self.traffic_light = Trafficlight(self.node)
+        self.stop_line = Stopline(self.node)
 
         self.trial = 0
 
@@ -249,8 +276,8 @@ class StateMachine():
             if self.odometry.x != 0.: #10.03 수정
                 steer, self.target_idx, hdr, ctr = self.st.stanley_control(self.odometry, self.path.cx, self.path.cy, self.path.cyaw, h_gain=1.0, c_gain=1.0)
                 target_speed = self.set_target_speed()
-                adapted_speed = self.ss.adaptSpeed(target_speed, hdr, ctr, min_value=5, max_value=15) # 에러(hdr, ctr) 기반 목표 속력 조정
-                speed = self.pid.PIDControl(self.odometry.v * 3.6, adapted_speed, min=5, max=15) # speed 조정 (PI control) 
+                adapted_speed = self.ss.adaptSpeed(target_speed, hdr, ctr, min_value=10, max_value=20) # 에러(hdr, ctr) 기반 목표 속력 조정
+                speed = self.pid.PIDControl(self.odometry.v * 3.6, adapted_speed, min=10, max=20) # speed 조정 (PI control) 
                 brake = self.cacluate_brake(adapted_speed) # brake 조정
 
                 # msg.speed = int(adapted_speed) * 10
@@ -265,8 +292,8 @@ class StateMachine():
             if self.odometry.x != 0.: #10.03 수정
                 steer, self.target_idx, hdr, ctr = self.st.stanley_control(self.odometry, self.path.cx, self.path.cy, self.path.cyaw, h_gain=1.0, c_gain=1.0)
                 target_speed = self.set_target_speed()
-                adapted_speed = self.ss.adaptSpeed(target_speed, hdr, ctr, min_value=4, max_value=10) # 에러(hdr, ctr) 기반 목표 속력 조정
-                speed = self.pid.PIDControl(self.odometry.v * 3.6, adapted_speed,  min=4, max=10) # speed 조정 (PI control) 
+                adapted_speed = self.ss.adaptSpeed(target_speed, hdr, ctr, min_value=10, max_value=15) # 에러(hdr, ctr) 기반 목표 속력 조정
+                speed = self.pid.PIDControl(self.odometry.v * 3.6, adapted_speed,  min=10, max=15) # speed 조정 (PI control) 
                 brake = self.cacluate_brake(adapted_speed) # brake 조정
 
                 # msg.speed = int(adapted_speed) * 10
@@ -276,7 +303,7 @@ class StateMachine():
                 msg.brake = int(brake)
             else:
                 pass
-        
+
         elif self.state.value[:-2] == "parking":
             if self.trial < 1: # 초기 시도 횟수 1
                 try:
@@ -295,7 +322,7 @@ class StateMachine():
 
         elif self.state.value[:-2] == "pickup":
             msg, self.abs_var, self.mission_finish = self.pickup.control_pickup(self.odometry, self.path)
-        
+
         elif self.state.value[:-2] == "delivery":
             msg, self.mission_finish = self.delivery.control_delivery(self.odometry, self.abs_var, self.path)  # abs_var 설정, A1 = 1, A2 = 2, A3 = 3, B1 = 4, B2 = 5, B3 = 6 으로 픽업에서 들어오는값의 +3으로 계산되어 나옴
 
@@ -331,6 +358,7 @@ class StateMachine():
         self.update_state_and_path()
         msg = self.update_cmd_msg()
         self.pub.publish(msg)
+        print(self.abs_var)
         print(f"목표 인덱스: {self.target_idx}, 남은 인덱스:{len(self.path.cx)-self.target_idx}, STATE:{self.state.value[:-2]}")
         
 
@@ -362,7 +390,7 @@ def main():
     node = rclpy.create_node("state_machine_node")
 
     # Declare Params
-    node.declare_parameter("file_name", "bunsudae_v1.db") #kcity
+    node.declare_parameter("file_name", "bsbs.db") #kcity
     # node.declare_parameter("file_name", "global_path.db") #dolge
     # node.declare_parameter("file_name", "good.db") #bunsudae
     node.declare_parameter("odom_topic", "/localization/kinematic_state")

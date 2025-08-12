@@ -2,13 +2,15 @@ import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Odometry, Path
 from erp42_msgs.msg import ControlMessage, SerialFeedBack  # SerialFeedBack 추가
-from darknet_ros_msgs.msg import BoundingBoxes
+from yolo_msg.msg import TrafficSign
 from tf_transformations import euler_from_quaternion
 import math
 import numpy as np
 from stanley import Stanley
 from visualization_msgs.msg import Marker
+from collections import deque, Counter
 import time
+from yolo_msg.msg import BoundingBox, BoundingBoxArray
 
 
 class SpeedSupporter:
@@ -19,11 +21,19 @@ class SpeedSupporter:
         # self.he_thr = node.declare_parameter("/speed_supporter/he_thr",0.01).value
         # self.ce_thr = node.declare_parameter("/speed_supporter/ce_thr",0.02).value
 
-        self.he_gain = node.declare_parameter("/speed_supporter/he_gain_traffic", 40.0).value
-        self.ce_gain = node.declare_parameter("/speed_supporter/ce_gain_traffic", 20.0).value
+        self.he_gain = node.declare_parameter(
+            "/speed_supporter/he_gain_traffic", 40.0
+        ).value
+        self.ce_gain = node.declare_parameter(
+            "/speed_supporter/ce_gain_traffic", 20.0
+        ).value
 
-        self.he_thr = node.declare_parameter("/speed_supporter/he_thr_traffic",0.05).value
-        self.ce_thr = node.declare_parameter("/speed_supporter/ce_thr_traffic",0.001).value
+        self.he_thr = node.declare_parameter(
+            "/speed_supporter/he_thr_traffic", 0.05
+        ).value
+        self.ce_thr = node.declare_parameter(
+            "/speed_supporter/ce_thr_traffic", 0.001
+        ).value
 
     def func(self, x, a, b):
         return a * (x - b)
@@ -35,34 +45,45 @@ class SpeedSupporter:
         res = np.clip(value + err, min_value, max_value)
         return res
 
-class PID():
+
+class PID:
     def __init__(self, node):
         self.node = node
-        self.p_gain = node.declare_parameter("/stanley_controller/p_gain_traffic", 2.07).value
-        self.i_gain = node.declare_parameter("/stanley_controller/i_gain_traffic", 0.85).value
-       
+        self.p_gain = node.declare_parameter(
+            "/stanley_controller/p_gain_traffic", 2.07
+        ).value
+        self.i_gain = node.declare_parameter(
+            "/stanley_controller/i_gain_traffic", 0.85
+        ).value
+
         self.p_err = 0.0
         self.i_err = 0.0
         self.speed = 0.0
-        
-        self.current = node.get_clock().now().seconds_nanoseconds()[0] + (node.get_clock().now().seconds_nanoseconds()[1] / 1e9)
-        self.last = node.get_clock().now().seconds_nanoseconds()[0] + (node.get_clock().now().seconds_nanoseconds()[1] / 1e9)
+
+        self.current = node.get_clock().now().seconds_nanoseconds()[0] + (
+            node.get_clock().now().seconds_nanoseconds()[1] / 1e9
+        )
+        self.last = node.get_clock().now().seconds_nanoseconds()[0] + (
+            node.get_clock().now().seconds_nanoseconds()[1] / 1e9
+        )
+
     def PIDControl(self, speed, desired_value, min, max):
 
-        self.current = self.node.get_clock().now().seconds_nanoseconds()[0] + (self.node.get_clock().now().seconds_nanoseconds()[1] / 1e9)
+        self.current = self.node.get_clock().now().seconds_nanoseconds()[0] + (
+            self.node.get_clock().now().seconds_nanoseconds()[1] / 1e9
+        )
         dt = self.current - self.last
         self.last = self.current
 
         err = desired_value - speed
-        # self.d_err = (err - self.p_err) / dt 
+        # self.d_err = (err - self.p_err) / dt
         self.p_err = err
-        self.i_err += self.p_err * dt  * (0.0 if speed == 0 else 1.0)
+        self.i_err += self.p_err * dt * (0.0 if speed == 0 else 1.0)
 
         self.speed = speed + (self.p_gain * self.p_err) + (self.i_gain * self.i_err)
         return int(np.clip(self.speed, min, max))
 
 
-        
 class Trafficlight:
     def __init__(self, node):
         self.node = node
@@ -73,351 +94,206 @@ class Trafficlight:
 
         self.target_idx = 0
         self.pre_stanley_idx = 0
-        
-        # 신호등 관련 상태 변수 초기화
-        self.current_signal = None
-        self.signal_count = 0
-        self.red_light_detected = False
-        self.green_light_detected = False
+
+        # ── 신호 판단 관련 상태 ─────────────────────────────────────────────
+        self.signal_window = deque(maxlen=int(
+            node.declare_parameter("/traffic/vote_window", 10).value
+        ))
+        self.vote_k = int(node.declare_parameter("/traffic/vote_k", 6).value)
+        self.vote_hold_s = float(node.declare_parameter("/traffic/vote_hold_s", 0.3).value)
+        self.signal_timeout_s = float(node.declare_parameter("/traffic/signal_timeout_s", 0.5).value)
+
+        self.stable_signal = None        # 현재 확정 신호: 'red'/'yellow'/'green'/None
+        self.prev_stable_signal = None   # 직전 확정 신호
+        self.last_stable_change_ts = 0.0 # 확정 신호가 바뀐 시각
+        self.last_signal_time = 0.0      # 마지막 YOLO 메시지 수신 시각
+
         self.mission_finish = False
-        self.current_odometry = None
-        self.start_code = True  # 일단 버리자
+        self.start_code = True
 
-        self.red_light_time = None
-        self.green_light_time = None
-        self.none_light_time = None
-        self.recent_signals = []
-        
         self.target_speed = 8
-        
-        # 신호등 인덱스 0~6 !!!!!!!!!!!!!!!!!!
-        self.current_index = 3
+        self.speed = 0
+        self.estop = 0
 
-        self.last_signal_time = time.time()
-
-        # 퍼블리셔 설정
         self.control_pub = self.node.create_publisher(ControlMessage, "cmd_msg", 10)
-        
-        # 신호등 인식 데이터 구독
+
         self.traffic_light_sub = self.node.create_subscription(
-            BoundingBoxes, "bounding_boxes", self.traffic_light_callback, 10
+            BoundingBoxArray, "/yolo/light", self.traffic_light_callback, 10
         )
-
-        self.traffic_light_sections = [
-            # 각 구간에 대한 빨간불 ID, 초록불 ID 설정, 왼빨강불 오초록불
-
-            #돌계 테스트용
-            # ({"A3", "A2"}, {"A1"}),  #첫  번째 신호등 (current_index=1)
-            
-            (
-                {"1401","1301"},           # 첫 번째 신호등 (current_index=0) 
-                {"1405","1300", "1400","1402"},
-            ),                             
-            ({"1401","1301"}, { "1402", "1405", "1400", "1300"}),  # 두 번째 신호등 (current_index=1)
-            ({"1401","1301"}, {"1400", "1405", "1300","1402","1302"}),  # 세 번째 신호등 (current_index=2)
-            (
-                {"1400", "1401", "1300","1301"},
-                {"1402","1403", "1303", "1404","1302"},
-            ),                              # 네 번째 신호등 (current_index=3)
-            ({"1301", "1401"}, {"1303", "1403", "1404"}),           # 다섯 번째 신호등 (current_index=4)
-            
-            ({"1401", "1301"}, {"1400","1405", "1300", "1402", "1302", "1404"}),  # 여섯 번째 신호등 (current_index=5)
-            ({"1401", "1301"}, {"1400","1405", "1300", "1402", "1302", "1404"}),  # 일곱 번째 신호등 (current_index=6)
-        ] 
-
-
 
         self.count = 0
 
+        # 정지선 근접 판정(인덱스 기반): 맵 해상도에 따라 조정
+        self.brake_distance_idx = int(node.declare_parameter("/traffic/brake_distance_idx", 30).value)
+        self.stop_near_idx = int(node.declare_parameter("/traffic/stop_near_idx", 5).value)
+        self.yellow_stop_idx = int(node.declare_parameter("/traffic/yellow_stop_idx", 15).value)
 
+    # ── 유틸: 클래스 이름 정규화 ───────────────────────────────────────────
+    def _normalize_label(self, name: str):
+        if not name:
+            return None
+        s = name.lower()
+        if "red" in s or "stop" in s:
+            return "red"
+        if "green" in s or "go" in s:
+            return "green"
+        if "yellow" in s or "amber" in s:
+            return "yellow"
+        return None  # 모르는 라벨은 집계 제외
 
+    # ── 유틸: 다수결로 확정 신호 갱신 ─────────────────────────────────────
+    def _update_stable_signal(self):
+        # 드롭아웃: 최근 수신이 오래되면 확정 해제
+        now = time.time()
+        if self.last_signal_time > 0 and (now - self.last_signal_time) > self.signal_timeout_s:
+            # 신호 끊김
+            if self.stable_signal is not None:
+                self.prev_stable_signal = self.stable_signal
+                self.stable_signal = None
+                self.last_stable_change_ts = now
+            return
 
-        
-    # 신호등의 초록불, 빨간불 분류
-    def get_current_traffic_light_ids(self):
-        red_ids = self.traffic_light_sections[self.current_index][0]
-        green_ids = self.traffic_light_sections[self.current_index][1]
-        return red_ids, green_ids
+        # 윈도우에서 유효 라벨만 집계
+        valid = [x for x in self.signal_window if x in ("red", "yellow", "green")]
+        if not valid:
+            return
 
-        
-    # 신호 확정
-    def traffic_light_callback(self, msg):
+        counts = Counter(valid)
+        # 현재 확정 신호에서 바꾸려면 hold 시간 지나야 함
+        can_switch = (now - self.last_stable_change_ts) >= self.vote_hold_s
+
+        # K개 이상인 후보들 중 count가 가장 큰 라벨 선택
+        candidates = [(lab, cnt) for lab, cnt in counts.items() if cnt >= self.vote_k]
+        if not candidates:
+            return
+
+        candidates.sort(key=lambda x: x[1], reverse=True)
+        top_label, top_count = candidates[0]
+
+        if self.stable_signal is None:
+            # 처음 확정
+            self.prev_stable_signal = None
+            self.stable_signal = top_label
+            self.last_stable_change_ts = now
+        else:
+            if top_label != self.stable_signal and can_switch:
+                self.prev_stable_signal = self.stable_signal
+                self.stable_signal = top_label
+                self.last_stable_change_ts = now
+
+    # ── 콜백: YOLO 신호 수신 → 윈도우에 반영 ───────────────────────────────
+    def traffic_light_callback(self, msg: BoundingBoxArray):
         self.last_signal_time = time.time()
-        if self.start_code:
-            detected_signal = None
-            confidence = 0.0
-
-            # 현재 구간의 신호등 ID 가져오기
-            red_ids, green_ids = self.get_current_traffic_light_ids()
-
-            for box in msg.bounding_boxes:
-                
-                detected_signal = box.class_id  
-
-
-                confidence = box.probability  # 신뢰도 사용 X
-
-                if detected_signal in red_ids:
-
-                    self.red_light_detected = True
-                    self.red_light_time = time.time()
-                    self.recent_signals.append("red")
-
-                    self.none_light_time = None
-
-                elif detected_signal in green_ids:
-
-                    self.green_light_detected = True
-                    self.green_light_time = time.time()
-                    self.recent_signals.append("green")
-
-                    self.none_light_time = None
-                else:  # 해당되지 않는 신호 잡힐 때
-                    self.none_light_time = time.time()
-                    self.recent_signals.append("none")
-
-                self.get_real_light()  # 잡히는 것 중에 알맞는 방식 채택
-
-    # 초록불이나 빨간불중 하나만 잡히면 확정시킴
-    def get_real_light(self):
-        
-        if self.red_light_detected and not self.green_light_detected:
-            self.current_signal = "red"
-            return
-        if self.green_light_detected and not self.red_light_detected:
-            self.current_signal = "green"
+        if not self.start_code:
             return
 
-        # 카운트를 세서 기준치 이상이면 확정
-        count_threshold = 6
-        
-        # 최근 10번의 카운트중 최근 같은 카운트가 6번 이상이면 신호 전환
-        if len(self.recent_signals) > 10:
-            self.recent_signals = self.recent_signals[-10:]
+        # 가장 아래(화면 기준 가까운) 객체를 대표로 사용
+        data_list = [
+            {"class_name": box.class_name, "confidence": box.confidence, "center_y": box.center_y}
+            for box in msg.boxes
+        ]
+        data_list.sort(key=lambda x: x["center_y"], reverse=False)
 
-        if (
-            self.recent_signals.count("red") >= count_threshold
-            and self.current_signal == "green"
-        ):
-            self.current_signal = "red"
-            self.time_reset()
-            return
-        if (
-            self.recent_signals.count("green") >= count_threshold
-            and self.current_signal == "red"
-        ):
-            self.current_signal = "green"
-            self.time_reset()
-            return
+        if data_list:
+            lab = self._normalize_label(data_list[0]["class_name"])
+            if lab is not None:
+                self.signal_window.append(lab)
+        # 비어있으면 윈도우에 아무 것도 넣지 않음(잡음 방지)
 
-        # 계속해서 하나만 잡히면 신호 확정
-        if self.recent_signals.count("red") == 10:
-            self.current_signal = "red"
-            self.time_reset()
-            return
-        if self.recent_signals.count("green") == 10:
-            self.current_signal = "green"
-            self.time_reset()
-            return
+        self._update_stable_signal()
 
-
-        # 확정되고 타이머로 하나가 잡히면 확정
-        time_threshold = 2
-        if (
-            self.current_signal is not None
-            and self.green_light_time is not None
-            and self.red_light_time is not None
-        ):
-            if (
-                time.time() - self.red_light_time > time.time() - self.green_light_time
-            ):  # 최근에 초록불이 켜짐
-                if (
-                    time.time() - self.green_light_time > time_threshold
-                ):  # 초록불이 켜지고 2초동안 다른게 안잡히면
-                    self.current_signal = "green"
-                    self.time_reset()
-                    return
-            else:  # 최근에 빨간불이 켜짐
-                if (
-                    time.time() - self.red_light_time > time_threshold
-                ):  # 빨간불이 잡히고 2초동안 다른게 안잡힘
-                    self.current_signal = "red"
-                    self.time_reset()
-                    return
-
-        if (
-            self.current_signal is not None and self.none_light_time is not None
-        ):  # 한번 확정되고 나서 오랫동안 아무것도 안잡히면
-            if time.time() - self.none_light_time > 3:
-                self.current_signal = None
-                self.green_light_detected = False
-                self.red_light_detected = False
-                self.time_reset()
-
-    def time_reset(self):
-        self.red_light_time = None
-        self.green_light_time = None
-        
-    
-
-        
+    # ── 제어 루프 ──────────────────────────────────────────────────────────
     def control_traffic_light(self, odometry, path):
-        if self.start_code == False:
+        if self.start_code is False:
             self.start_code = True
 
-
-        msg = ControlMessage()
         steer, self.target_idx, hdr, ctr = self.st.stanley_control(
             odometry,
-            path.cx,
-            path.cy,
-            path.cyaw,
-            h_gain=0.5,
-            c_gain=0.24,
+            path.cx, path.cy, path.cyaw,
+            h_gain=0.5, c_gain=0.24,
         )
 
         current_distance_to_stop_line = len(path.cx) - self.target_idx
+        sig = self.stable_signal  # 'red'/'yellow'/'green'/None
 
-        # 빨간불 감지 시 처리
-        if self.current_signal == "red":
-            self.count = 0 # red 신로 잡히면 count 0으로 초기화
+        msg = ControlMessage()
 
-            if current_distance_to_stop_line <= 10:
-                speed = 0
-                estop = 1
-                self.node.get_logger().info(f"빨간불 확인: 차량 정지, 현재속도 = {msg.speed}")
-
-                if time.time() - self.last_signal_time > 3:
-                    self.node.get_logger().info("신호없음, 그냥 출발")
-                    self.red_light_detected = False
-                    self.green_light_detected = False
-                    self.current_signal = None
-                    
+        # ── 신호별 로직 ───────────────────────────────────────────────────
+        if sig == "red":
+            if current_distance_to_stop_line <= self.brake_distance_idx:
+                self.speed = 0
+                self.estop = 1
+                self.node.get_logger().info("빨간불: 정지")
             else:
-                self.target_speed = (current_distance_to_stop_line / len(path.cx)) * 15
-                self.target_speed = int(np.clip(self.target_speed, 6, 8))
-                adapted_speed = self.ss.adaptSpeed(self.target_speed, hdr, ctr, min_value=6, max_value=8)
-                speed = self.pid.PIDControl(odometry.v * 3.6, adapted_speed, min=6, max=8)
-                estop = 0
-                self.node.get_logger().info(f"빨간불 감지: 차량 감속, 현재속도 = {msg.speed}")
+                # 아직 멀면 안전 저속으로 접근
+                self.target_speed = int(np.clip(
+                    (current_distance_to_stop_line / max(1, len(path.cx))) * 15, 6, 8
+                ))
+                adapted_speed = self.ss.adaptSpeed(self.target_speed, hdr, ctr, 6, 8)
+                self.speed = self.pid.PIDControl(odometry.v * 3.6, adapted_speed, 6, 8)
+                self.estop = 0
+                self.node.get_logger().info("빨간불 원거리: 감속 접근")
 
-        # 초록불 감지된 경우 처리
-        elif self.current_signal == "green":
-            self.count = 0 # green 신로 잡히면 count 0으로 초기화
-
-            if self.current_index == 6:
-                self.target_speed = 16
-                adapted_speed = self.ss.adaptSpeed(self.target_speed, hdr, ctr, min_value=14, max_value=16)
-                speed = self.pid.PIDControl(odometry.v * 3.6, adapted_speed, min=14, max=16)
-                estop = 0
-                self.node.get_logger().info(f"초록불 감지: 주행 지속, 속도 유지 = {msg.speed}")
-
-            else:
-                self.target_speed = 10
-                adapted_speed = self.ss.adaptSpeed(self.target_speed, hdr, ctr, min_value=8, max_value=10)
-                speed = self.pid.PIDControl(odometry.v * 3.6, adapted_speed, min=8, max=10)
-                estop = 0
-                self.node.get_logger().info(f"초록불 감지: 주행 지속, 속도 유지 = {msg.speed}")
-
-            if current_distance_to_stop_line <= 5:
+            if current_distance_to_stop_line <= self.stop_near_idx:
                 self.mission_finish = True
-                self.node.get_logger().info("초록불 주행 중 미션 완료")
+                self.node.get_logger().info("빨간불: 정지선 부근 미션 완료")
 
-        # 신호 확정 불가 시 처리
-        else:
-
-            self.count += 1 #아무 신호도 안 잡히면 count를 0.1초마다 1씩 증가
-            if self.current_index == 6:
-                if current_distance_to_stop_line <= 5:
-                    if self.count >= 40:
-                        self.target_speed = 16
-                        adapted_speed = self.ss.adaptSpeed(self.target_speed, hdr, ctr, min_value=14, max_value=16)
-                        speed = self.pid.PIDControl(odometry.v * 3.6, adapted_speed, min=14, max=16)
-                        estop = 0
-                        self.mission_finish = True
-                        self.node.get_logger().info("불가피한 미션 완료")
-
-                    else:
-                        speed = 0
-                        estop = 1
-
-                else:
-                    self.target_speed = 16
-                    adapted_speed = self.ss.adaptSpeed(self.target_speed, hdr, ctr, min_value=14, max_value=16)
-                    speed = self.pid.PIDControl(odometry.v * 3.6, adapted_speed, min=14, max=16)
-                    estop = 0
-                    self.node.get_logger().info("신호등 확정불가")
-
-
-            elif self.current_index == 4:
-                if current_distance_to_stop_line <= 5:
-                    if self.count >= 700:
-                        self.target_speed = 10
-                        adapted_speed = self.ss.adaptSpeed(self.target_speed, hdr, ctr, min_value=8, max_value=10)
-                        speed = self.pid.PIDControl(odometry.v * 3.6, adapted_speed, min=8, max=10)
-                        estop = 0
-                        self.mission_finish = True
-                        self.node.get_logger().info("불가피한 미션 완료")
-
-                    else:
-                        speed = 0
-                        estop = 1
-
-                else:
-                    self.target_speed = 10
-                    adapted_speed = self.ss.adaptSpeed(self.target_speed, hdr, ctr, min_value=8, max_value=10)
-                    speed = self.pid.PIDControl(odometry.v * 3.6, adapted_speed, min=8, max=10)
-                    estop = 0
-                    self.node.get_logger().info("신호등 확정불가")
-
-
+        elif sig == "yellow":
+            # 멀면 저속 통과, 가까우면 정지
+            if current_distance_to_stop_line <= self.yellow_stop_idx:
+                self.speed = 0
+                self.estop = 1
+                self.node.get_logger().info("노란불 근접: 정지 선택")
             else:
-                if current_distance_to_stop_line <= 5:
-                    if self.count >= 40:
-                        self.target_speed = 10
-                        adapted_speed = self.ss.adaptSpeed(self.target_speed, hdr, ctr, min_value=8, max_value=10)
-                        speed = self.pid.PIDControl(odometry.v * 3.6, adapted_speed, min=8, max=10)
-                        estop = 0
-                        self.mission_finish = True
-                        self.node.get_logger().info("불가피한 미션 완료")
+                self.target_speed = 8  # 저속 유지
+                adapted_speed = self.ss.adaptSpeed(self.target_speed, hdr, ctr, 8, 10)
+                self.speed = self.pid.PIDControl(odometry.v * 3.6, adapted_speed, 8, 10)
+                self.estop = 0
+                self.node.get_logger().info("노란불 원거리: 저속 통과")
 
-                    else:
-                        speed = 0
-                        estop = 1
+            if current_distance_to_stop_line <= self.stop_near_idx:
+                self.mission_finish = True
+                self.node.get_logger().info("노란불: 정지선 부근 미션 완료")
 
-                else:
-                    self.target_speed = 10
-                    adapted_speed = self.ss.adaptSpeed(self.target_speed, hdr, ctr, min_value=8, max_value=10)
-                    speed = self.pid.PIDControl(odometry.v * 3.6, adapted_speed, min=8, max=10)
-                    estop = 0
-                    self.node.get_logger().info("신호등 확정불가")
+        elif sig == "green" or sig is None:
+            # 초록 또는 신호 미확정(None) 시 기본 주행(보수적이면 None을 저속으로도 가능)
+            self.target_speed = 10
+            adapted_speed = self.ss.adaptSpeed(self.target_speed, hdr, ctr, 8, 10)
+            self.speed = self.pid.PIDControl(odometry.v * 3.6, adapted_speed, 8, 10)
+            self.estop = 0
+            if sig == "green":
+                self.node.get_logger().info("초록불: 주행 유지")
+            else:
+                self.node.get_logger().info("신호없음: 기본 주행 유지")
 
+            if current_distance_to_stop_line <= self.stop_near_idx:
+                self.mission_finish = True
+                self.node.get_logger().info("초록/무신호: 정지선 통과 미션 완료")
 
-            print(self.count)
-
+        # ── 메시지 채우기 ─────────────────────────────────────────────────
         msg.steer = int(math.degrees(-1 * steer))
-        msg.speed = int(speed) * 10
+        msg.speed = int(self.speed) * 10
         msg.gear = 2
-        msg.estop = estop
+        msg.estop = self.estop
+
+        # ── 미션 종료 처리 ────────────────────────────────────────────────
+        if current_distance_to_stop_line <= 1:
+            self.mission_finish = True
+            self.node.get_logger().info("강제 미션 완료")
 
         if self.mission_finish:
-            if self.current_index != 6:
-                self.current_index += 1
-                self.reset_traffic_light()
-                self.node.get_logger().info(
-                    f"미션 완료: 다음 신호등 구간으로 이동 (Index: {self.current_index})"
-                )
-                
+            self.node.get_logger().info("미션 완료: 다음 신호등 구간으로 이동")
             self.start_code = False
-            return msg, True  # 미션 완료
+            self.mission_finish = False
+            return msg, True
 
-        return msg, False  # 미션이 완료되지 않았을 때 반환
-    
+        return msg, False
+
     def reset_traffic_light(self):
-        # 신호 관련 상태를 초기화하는 함수
-        self.red_light_detected = False
-        self.green_light_detected = False
-        self.signal_count = 0  # 신호 카운트 리셋
-        self.current_signal = None  # 현재 신호 리셋
+        self.signal_window.clear()
+        self.stable_signal = None
+        self.prev_stable_signal = None
+        self.last_stable_change_ts = 0.0
+        self.last_signal_time = 0.0
         self.mission_finish = False
-        self.recent_signals = []
+        self.start_code = True

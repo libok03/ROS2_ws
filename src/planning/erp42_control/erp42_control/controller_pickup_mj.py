@@ -86,7 +86,7 @@ class Pickup():
 
         self.yolo_sub = self.node.create_subscription(
             TrafficSign,
-            "/traffic_sign_map",
+            "/traffic_sign",
             self.yolo_callback,
             10
         )
@@ -109,8 +109,8 @@ class Pickup():
             if self.queue.count(label) >= 6:
                 idx = label    # "1", "2", "3"
                 self.abs_var = int(label+3)
+                print(self.abs_var, "detected")
                 # 딱 한 번만 하고 끝내고 싶으면 return 추가
-                return
 
 
     def control_pickup(self, odometry, path):
