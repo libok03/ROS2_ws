@@ -27,11 +27,19 @@ class SpeedSupporter:
         # self.he_thr = node.declare_parameter("/speed_supporter/he_thr",0.01).value
         # self.ce_thr = node.declare_parameter("/speed_supporter/ce_thr",0.02).value
 
-        self.he_gain = node.declare_parameter("/speed_supporter/he_gain_obstacle", 50.0).value
-        self.ce_gain = node.declare_parameter("/speed_supporter/ce_gain_obstacle", 30.0).value
+        self.he_gain = node.declare_parameter(
+            "/speed_supporter/he_gain_obstacle", 50.0
+        ).value
+        self.ce_gain = node.declare_parameter(
+            "/speed_supporter/ce_gain_obstacle", 30.0
+        ).value
 
-        self.he_thr = node.declare_parameter("/speed_supporter/he_thr_obstacle",0.001).value
-        self.ce_thr = node.declare_parameter("/speed_supporter/ce_thr_obastacle",0.002).value
+        self.he_thr = node.declare_parameter(
+            "/speed_supporter/he_thr_obstacle", 0.001
+        ).value
+        self.ce_thr = node.declare_parameter(
+            "/speed_supporter/ce_thr_obastacle", 0.002
+        ).value
 
     def func(self, x, a, b):
         return a * (x - b)
@@ -43,32 +51,44 @@ class SpeedSupporter:
         res = np.clip(value + err, min_value, max_value)
         return res
 
-class PID():
+
+class PID:
     def __init__(self, node):
         self.node = node
-        self.p_gain = node.declare_parameter("/stanley_controller/p_gain_obstacle", 2.07).value
-        self.i_gain = node.declare_parameter("/stanley_controller/i_gain_obstacle", 0.85).value
-       
+        self.p_gain = node.declare_parameter(
+            "/stanley_controller/p_gain_obstacle", 2.07
+        ).value
+        self.i_gain = node.declare_parameter(
+            "/stanley_controller/i_gain_obstacle", 0.85
+        ).value
+
         self.p_err = 0.0
         self.i_err = 0.0
         self.speed = 0.0
-        
-        self.current = node.get_clock().now().seconds_nanoseconds()[0] + (node.get_clock().now().seconds_nanoseconds()[1] / 1e9)
-        self.last = node.get_clock().now().seconds_nanoseconds()[0] + (node.get_clock().now().seconds_nanoseconds()[1] / 1e9)
+
+        self.current = node.get_clock().now().seconds_nanoseconds()[0] + (
+            node.get_clock().now().seconds_nanoseconds()[1] / 1e9
+        )
+        self.last = node.get_clock().now().seconds_nanoseconds()[0] + (
+            node.get_clock().now().seconds_nanoseconds()[1] / 1e9
+        )
+
     def PIDControl(self, speed, desired_value):
 
-        self.current = self.node.get_clock().now().seconds_nanoseconds()[0] + (self.node.get_clock().now().seconds_nanoseconds()[1] / 1e9)
+        self.current = self.node.get_clock().now().seconds_nanoseconds()[0] + (
+            self.node.get_clock().now().seconds_nanoseconds()[1] / 1e9
+        )
         dt = self.current - self.last
         self.last = self.current
 
         err = desired_value - speed
-        # self.d_err = (err - self.p_err) / dt 
+        # self.d_err = (err - self.p_err) / dt
         self.p_err = err
-        self.i_err += self.p_err * dt  * (0.0 if speed == 0 else 1.0)
+        self.i_err += self.p_err * dt * (0.0 if speed == 0 else 1.0)
 
         self.speed = speed + (self.p_gain * self.p_err) + (self.i_gain * self.i_err)
         return int(np.clip(self.speed, 4, 6))
-    
+
 
 class Obstacle:
     def __init__(self, node):
@@ -128,11 +148,13 @@ class Obstacle:
         self.ss = SpeedSupporter(node)
 
         self.code_start = True
-        self.state = "static"
+        self.state = "dynamic"  # dynamic, static
         self.change_time = None
         self.estop = 0
         self.observed_points = []
-        self.o_list = [0]*10
+        self.o_list = [0] * 50
+
+        self.once = 0  # 처음에 한번만 실행하기 위한 변수
 
     def call_marker(self, msg):
         if self.code_start:
@@ -392,7 +414,7 @@ class Obstacle:
         # Initialize lists to store x, y, and yaw values
         local_x = []
         local_y = []
-        local_yaw = [] 
+        local_yaw = []
 
         # Extract x and y coordinates from points
         for x_points, y_points in points:
@@ -519,30 +541,17 @@ class Obstacle:
         if size_type == "small":
 
             line2_DA = [
-                (150.61904907226562,-75.47592163085938),
-                (149.5785675048828, -74.3557357788086),
-                (54.719024658203125, -130.14352416992188),
-                (55.06684875488281, -131.92755126953125),
+                (174.3036346435547, -29.518701553344727),
+                (173.55572509765625, -28.224584579467773),
+                (77.6576, -82.3811),
+                (78.2905, -83.6974),
             ]  # DA = detection_area
 
             line1_DA = [
-                (35.5591, 104.309),
-                (35.9856, 105.058),
-                (22.7638, 112.018),
-                (22.2762, 110.953),
-            ]
-        if size_type == "big":
-            line1_DA = [
-                (-37.1543, -55.9792),
-                (-36.4105, -59.4389),
-                (-3.86779, -62.9776),
-                (-4.22124, -61.1396),
-            ]  # DA = detection_area
-            line2_DA = [
-                (132.002, 254.289),
-                (133.863, 253.742),
-                (138.002, 267.316),
-                (135.92, 268.411),
+                (178.405, -29.3547),
+                (177.318, -28.3859),
+                (78.9209, -84.3033),
+                (79.945, -86.629),
             ]
 
         # Create polygons from the detection areas
@@ -555,7 +564,7 @@ class Obstacle:
         self.publish_polygon(line2_DA, "line2", 1.0, 0.0, 0.0, 1.0)  # Red
 
         # Check if any of the obstacles are within the detection area
-        
+
         for obs_point in self.obs:
 
             point = Point(obs_point)
@@ -572,32 +581,48 @@ class Obstacle:
 
                 self.num2_obs.append((point.x, point.y))
                 break
-    
+
     def stop_to(self):
         polygon_points = [
-            (152.68667602539062, -76.75296783447266),
-            (149.96263122558594, -73.62805938720703),
-            (52.68206787109375, -131.16880798339844),
-            (54.17646026611328, -135.12939453125),
+            (73.94788360595703, -91.37284851074219),
+            (71.81258392333984, -86.93596649169922),
+            (175.8633270263672, -26.53049087524414),
+            (177.93630981445312, -30.269697189331055),
         ]
         # Create the polygon
         polygon = Polygon(polygon_points)
         self.publish_polygon(polygon_points, "dynamic", 1.0, 1.0, 0.0, 1.0)
-        
+
+        print("self.observed_points", self.observed_points)
         if self.observed_points:
+            print("a")
             for obs_point in self.observed_points:
                 point = Point(obs_point)
                 if polygon.contains(point):
+
                     self.o_list.append(1)
                     del self.o_list[0]
-
+                    self.observed_points = []
                 else:
+
                     self.o_list.append(0)
                     del self.o_list[0]
-                
-        if 1 in  self.o_list:
-            self.estop =1
-        else : self.estop =0
+
+        else:
+
+            self.o_list.append(0)
+            del self.o_list[0]
+
+        if 1 in self.o_list:
+            self.estop = 1
+            self.once = 1
+
+        else:
+            self.estop = 0
+            if self.once == 1:
+                self.once = 0
+                self.change_time = t.time()
+                self.obs = []
 
     def control_obstacle(self, odometry, path):
         self.odometry = odometry
@@ -614,9 +639,9 @@ class Obstacle:
                 c_gain=0.8,
             )
             # print(ctr,hdr)
-            target_speed = 5.0
+            target_speed = 15.0
             adapted_speed = self.ss.adaptSpeed(
-                target_speed, hdr, ctr, min_value=4, max_value=6
+                target_speed, hdr, ctr, min_value=10, max_value=15
             )
             speed = self.pid.PIDControl(odometry.v * 3.6, adapted_speed)
 
@@ -629,9 +654,9 @@ class Obstacle:
                 h_gain=1.0,
                 c_gain=0.8,
             )
-            target_speed = 7.0
+            target_speed = 15.0
             adapted_speed = self.ss.adaptSpeed(
-                target_speed, hdr, ctr, min_value=6, max_value=8
+                target_speed, hdr, ctr, min_value=10, max_value=15
             )
             speed = self.pid.PIDControl(self.odometry.v * 3.6, adapted_speed)
 
@@ -665,25 +690,34 @@ class Obstacle:
             if self.state == "static":
                 # k-city2 @ 작은거
                 self.publish_ref_path(
-                    wx=[150.255615234375, 55.690006256103516],
-                    wy=[-75.30509948730469, -131.1913604736328],
-                    num=2,
+                    wx=[179.949, 79.5295, 67.04232025146484],
+                    wy=[-27.069, -86.3704, -93.48049926757812],
+                    num=1,
                 )  # 1차선 center line
 
                 self.publish_ref_path(
-                    wx=[151.7549591064453, 55.868934631347656],
-                    wy=[-77.09352111816406, -133.95851135253906],
-                    num=1,
+                    wx=[179.092, 77.98530578613281],
+                    wy=[-25.5873, -83.03504180908203],
+                    num=2,
                 )  # 2차선 center line
                 self.check_obstacle("small")
 
                 self.organize_obstacle_lists()
                 self.obs_marker()
                 self.line_change()
-                if self.change_time is not None:
-                    if t.time() - self.change_time > 2:  # 장애물 회피 시작후 5초가 지나면
-                        self.state = "dynamic"
+
             elif self.state == "dynamic":
+                self.publish_ref_path(
+                    wx=[179.949, 79.5295],
+                    wy=[-27.069, -86.3704],
+                    num=1,
+                )  # 1차선 center line
+
+                self.publish_ref_path(
+                    wx=[179.092, 78.6943],
+                    wy=[-25.5873, -85.0537],
+                    num=2,
+                )
                 self.local_points = []
                 for p1, p2 in zip(self.ref_path_points2, self.ref_path_points1):
                     avg_point = [
@@ -693,3 +727,8 @@ class Obstacle:
 
                 self.publish_local_path(self.local_points)
                 self.stop_to()
+                if self.change_time is not None:
+                    if (
+                        t.time() - self.change_time > 2
+                    ):  # 장애물 회피 시작후 5초가 지나면
+                        self.state = "static"

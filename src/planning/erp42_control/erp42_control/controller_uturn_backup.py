@@ -114,10 +114,9 @@ class Uturn:
         self.in_path_db = DB("U-turn_IN.db")  # kcity
         self.in_path = self.in_path_db.read_db_n("Path", "x", "y", "yaw")
 
-        # Turn_path (템플릿/작업본 분리)  # FIX: 더블-쉬프트 방지
+        # Turn_path
         self.turn_db = DB("U-turn.db")
-        self.turn_path_template = self.turn_db.read_db_n("Path", "x", "y", "yaw")  # 원본
-        self.turn_path = list(self.turn_path_template)  # 현재 적용본
+        self.turn_path = self.turn_db.read_db_n("Path", "x", "y", "yaw")
 
         # Out_path
         self.out_path_db = DB("U-turn_OUT.db")
@@ -143,19 +142,14 @@ class Uturn:
             Path, "uturn_path", qos_profile_system_default
         )
 
-    # FIX: 콘 버퍼 완전 초기화 후 새 메시지로 채움(리스트 누적 방지)
     def cone_callback(self, msg):
-        self.cones = []  # 새 메시지로 초기화
+        self.cones = self.cones[-10:]  # Clear the list before appending new points
         for pose in msg.poses:
             point = Point()
             point.x = pose.position.x
             point.y = pose.position.y
             point.z = pose.position.z
             self.cones.append(point)
-
-    # FIX: 항상 템플릿에서 평행이동 경로를 생성
-    def _translated_turn_path(self, dx, dy):
-        return [(p[0] + dx, p[1] + dy, p[2]) for p in self.turn_path_template]
 
     def control_uturn(self, odometry):
         self.odometry = odometry
@@ -182,22 +176,20 @@ class Uturn:
 
             flag, dx, dy = self.in_uturn()
             if flag:
-                # FIX: 템플릿에서 새로 평행이동 복제
-                self.turn_path = self._translated_turn_path(dx, dy)
+                # 평행이동된 turn_path 생성
+                self.turn_path = [(p[0] + dx, p[1] + dy, p[2]) for p in self.turn_path]
                 self.state = Uturn_state.Turn
-
             # 만약 적절한 턴 지점을 못찾으면 강제 턴
             if target_idx >= len(path_x) - 3:
-                # FIX: 강제 진입도 템플릿 기준으로 계산
-                path0_x, path0_y = self.turn_path_template[0][0], self.turn_path_template[0][1]
+                path0_x, path0_y = self.turn_path[0][0], self.turn_path[0][1]
                 dx = self.odometry.x - path0_x
                 dy = self.odometry.y - path0_y
-                self.turn_path = self._translated_turn_path(dx, dy)
+                self.turn_path = [(p[0] + dx, p[1] + dy, p[2]) for p in self.turn_path]
                 self.state = Uturn_state.Turn
 
         elif self.state == Uturn_state.Turn:
             # 잘 못된 턴 지점이 들어오면 In 초기화
-            collides = self.correct_turn()  # True면 콘과 2m 이내(=충돌)
+            flag = self.correct_turn()
 
             path_x = [p[0] for p in self.turn_path]
             path_y = [p[1] for p in self.turn_path]
@@ -215,12 +207,14 @@ class Uturn:
             msg.speed = int(5) * 10
             msg.steer = int(m.degrees((-1) * steer))
             msg.gear = 2
-
-            # FIX: 충돌이면 In으로 롤백, 안전하면 Out 전환만 판단
-            if collides:
-                self.state = Uturn_state.In
-            elif target_idx >= len(path_x) - 3:
-                self.state = Uturn_state.Out
+            if flag:
+                if target_idx >= len(path_x) // 2:
+                    self.state = Uturn_state.Out
+                else:
+                    self.state = Uturn_state.In
+            else:
+                if target_idx >= len(path_x) - 3:
+                    self.state = Uturn_state.Out
 
         elif self.state == Uturn_state.Out:
             path_x = [p[0] for p in self.out_path]
@@ -245,33 +239,40 @@ class Uturn:
         return msg, False
 
     def in_uturn(self):
-        # FIX: 템플릿 기준으로 평행이동 벡터 계산
-        if len(self.turn_path_template) == 0:
+        if len(self.turn_path) == 0:
             return False, 0, 0
 
-        # cone 정보가 없으면 False 반환(원래 주석은 비활성화되어 있어 그대로 둠)
+        # cone 정보가 없으면 False 반환
+        # if len(self.cones) == 0:
+        #     return False, 0, 0
 
-        # odometry와 turn_path 템플릿의 첫 점을 일치시키기 위한 평행이동 벡터 계산
-        path0_x, path0_y = self.turn_path_template[0][0], self.turn_path_template[0][1]
+        # odometry와 turn_path의 첫 점을 일치시키기 위한 평행이동 벡터 계산
+
+        path0_x, path0_y = self.turn_path[0][0], self.turn_path[0][1]
         dx = self.odometry.x - path0_x
         dy = self.odometry.y - path0_y
 
-        # 평행이동된 템플릿 경로와 cone의 거리 비교
-        translated = self._translated_turn_path(dx, dy)
-        for px, py, _ in translated:
+        # 평행이동된 path와 cone의 거리 비교
+        for path_point in self.turn_path:
+            px, py = path_point[0] + dx, path_point[1] + dy
             for cone in self.cones:
                 dist = np.hypot(px - cone.x, py - cone.y)
                 if dist < 2.0:
                     return False, 0, 0
         return True, dx, dy
 
-    # True면 현재 TURN 경로가 콘과 충돌(2m 이내)
     def correct_turn(self):
-        if len(self.cones) == 0 or len(self.turn_path) == 0:
+        if len(self.cones) == 0:
             return False
 
-        # 현재 self.turn_path는 이미 평행이동된 상태
-        for px, py, _ in self.turn_path:
+        # odometry와 turn_path의 첫 점을 일치시키기 위한 평행이동 벡터 계산
+        path0_x, path0_y = self.turn_path[0][0], self.turn_path[0][1]
+        dx = self.odometry.x - path0_x
+        dy = self.odometry.y - path0_y
+
+        # 평행이동된 path와 cone의 거리 비교
+        for path_point in self.turn_path:
+            px, py = path_point[0] + dx, path_point[1] + dy
             for cone in self.cones:
                 dist = np.hypot(px - cone.x, py - cone.y)
                 if dist < 2.0:

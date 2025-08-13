@@ -101,8 +101,6 @@ class mpc_config:
     )  # final state error matrix, penalty  for the final state constraints: [x, y, delta, v, yaw, yaw-rate, beta]
     # ---------------------------------------------------
 
-
-
     # Rk: list = field(
     #     # default_factory=lambda: np.diag([0.01, 100.0])
     #     # default_factory=lambda: np.diag([0.5, 70.0])
@@ -123,15 +121,15 @@ class mpc_config:
     # )  # final state error matrix, penalty  for the final state constraints: [x, y, delta, v, yaw, yaw-rate, beta]
 
     # N_IND_SEARCH: int = 10  # Search index number
-    DTK: float = 0.05  # time step [s] kinematic
-    # dlk: float = 0.25  # dist step [m] kinematic
-    # LENGTH: float = 2.020  # Length of the vehicle [m]
+    DTK: float = 0.1  # time step [s] kinematic
+    dlk: float = 0.25  # dist step [m] kinematic
+    LENGTH: float = 2.020  # Length of the vehicle [m]
     # 1.240
     WIDTH: float = 1.160  # Width of the vehicle [m]
     WB: float = 1.040  # Wheelbase [m]
     MIN_STEER: float = -0.4189  # maximum steering angle [rad]
     MAX_STEER: float = 0.4189  # maximum steering angle [rad] # expand
-    MAX_DSTEER = np.deg2rad(10.0)  # 1.05 rad/s
+    MAX_DSTEER = np.deg2rad(30.0)  # 1.05 rad/s
     # MAX_STEER_V: float = 3.2  # maximum steering speed [rad/s]
     MAX_SPEED: float = 8.0  # maximum speed [m/s] ~ 5.0 for levine sim
     MIN_SPEED: float = -2.0  # minimum backward speed [m/s]
@@ -147,7 +145,6 @@ class State:
     yaw: float = 0.0
     yawrate: float = 0.0
     beta: float = 0.0
-
 
 
 class MPC(Node):
@@ -167,6 +164,7 @@ class MPC(Node):
         # a = str(a)
 
         self.state = State_mpc.A1A2
+        self.next_state = State_mpc.A2A3
 
         self.get_logger().fatal(f"State: {self.state.name}")
         self.get_logger().fatal(f"State: {self.state.name}")
@@ -192,8 +190,8 @@ class MPC(Node):
         # self.drive_pub = self.create_publisher(AckermannDriveStamped, drive_topic, 1) # mspeed
         # self.drive_msg = AckermannDriveStamped()
 
-        self.cmd_pub = self.create_publisher(ControlMessage, cmd_topic, 1)
-        self.cmd_msg = ControlMessage()
+        # self.cmd_pub = self.create_publisher(ControlMessage, cmd_topic, 1)
+        # self.cmd_msg = ControlMessage()
 
         self.vis_waypoints_pub = self.create_publisher(Marker, vis_waypoints_topic, 1)
         self.vis_waypoints_msg = Marker()
@@ -207,10 +205,21 @@ class MPC(Node):
         # map_path = os.path.abspath(os.path.join('src', 'csv_data'))
         # self.waypoints = np.loadtxt(map_path + '/' + self.map_name + '.csv', delimiter=';', skiprows=0)  # csv data
         self.waypoints = self.file_open_with_id(self.state.name)
-        self.waypoints = np.array(self.waypoints)
-        self.max_speed = (float(self.waypoints[3, 0]) / 3.6) + 1
+        self.waypoints_next = self.file_open_with_id(self.next_state.name)
 
-        self.waypoints[3, :] = self.waypoints[3, :] / 3.6  # 0609수정//kph → m/s
+        self.waypoints = np.array(self.waypoints)
+        self.waypoints_next = np.array(self.waypoints_next)
+
+        self.waypoints_merge = np.concatenate(
+            (self.waypoints, self.waypoints_next), axis=1
+        )
+
+        self.max_speed = (float(self.waypoints_merge[3, 0]) / 3.6) + 1
+
+        self.waypoints_merge[3, :] = (
+            self.waypoints_merge[3, :] / 3.6
+        )  # 0609수정//kph → m/s
+
         # self.waypoints = np.array(self.file_open_with_id[:])
         # if self.map_name == 'levine_2nd':
         #     self.waypoints[:, 2] += math.pi / 2
@@ -252,18 +261,16 @@ class MPC(Node):
         # extract pose from ROS msg
         # self.update_rotation_matrix(pose_msg)
         self.vehicle_state = self.update_vehicle_state(pose_msg, speed_msg)
-        print(f"mpc/-------------waypoints : {len(self.waypoints[0, : ])}------------")
-        print(f"mpc/id : {self.state.name}")
+        # print(f"mpc/-------------waypoints : {len(self.waypoints[0, : ])}------------")
+        # print(f"mpc/id : {self.state.name}")
         self.ref_path, self.target_idx = self.calc_ref_trajectory(
             self.vehicle_state,
-            self.waypoints[0, :],
-            self.waypoints[1, :],
-            self.waypoints[2, :],
-            self.waypoints[3, :],
+            self.waypoints_merge[0, :],
+            self.waypoints_merge[1, :],
+            self.waypoints_merge[2, :],
+            self.waypoints_merge[3, :],
         )
-        self.max_speed = (
-            self.waypoints[3, self.target_idx]
-        ) + 1  
+        self.max_speed = (self.waypoints_merge[3, self.target_idx]) + 1
 
         self.visualize_ref_traj_in_rviz(self.ref_path)
 
@@ -296,15 +303,15 @@ class MPC(Node):
 
             steer, self.target_idx, hdr, ctr = self.st.stanley_control(
                 self.vehicle_state,
-                self.waypoints[0, :],
-                self.waypoints[1, :],
-                self.waypoints[2, :],
+                self.waypoints_merge[0, :],
+                self.waypoints_merge[1, :],
+                self.waypoints_merge[2, :],
                 h_gain=0.5,
                 c_gain=0.24,
             )
-            self.pub_hdr.publish(Float32(data = hdr))
-            self.pub_ctr.publish(Float32(data = ctr))
-            target_speed = self.waypoints[
+            self.pub_hdr.publish(Float32(data=hdr))
+            self.pub_ctr.publish(Float32(data=ctr))
+            target_speed = self.waypoints_merge[
                 3, self.target_idx
             ]  ## self.target_idx 넣으면 안됨?
             return self.target_idx, steer, target_speed
@@ -324,8 +331,8 @@ class MPC(Node):
             # print(self.odelta_v[0])
             speed_output = self.vehicle_state.v + self.oa[0] * self.config.DTK
 
-            self.pub_hdr.publish(Float32(data = 0.0))
-            self.pub_ctr.publish(Float32(data = 0.0))
+            self.pub_hdr.publish(Float32(data=0.0))
+            self.pub_ctr.publish(Float32(data=0.0))
 
         return self.target_idx, steer_output, speed_output
 
@@ -627,10 +634,10 @@ class MPC(Node):
         # travel  = abs(state.v) * self.config.DTK
         # dind = travel / self.config.dlk
         # dind = int(np.clip(round(travel / self.config.dlk) + 1, 1, MAX_DIND))
-        dind = 3
+        dind = 6
         # dind = int(np.clip(state.v +1, 3, 5))
-        self.get_logger().info(f'travel : {dind}')
-        
+        # self.get_logger().info(f"travel : {dind}")
+
         rest_idx_num = max(
             len(cx) - ind - 1, 1
         )  # 남아있는 idx 개수에서 내 위치 뺀 것과 1 중에서 큰 값 결정, 최소 1 확보
@@ -660,8 +667,9 @@ class MPC(Node):
         # print(f"ref_traj[1, :] : {ref_traj[1, :]}")
         ref_traj[2, :] = sp[ind_list]
 
+        cx = self.waypoints[0, :]
         if ind >= len(cx) - 10:  # driving에서 state 전환 조건
-            print(ind, len(cx))
+            # print(ind, len(cx))
             states = list(State_mpc)
             current_index = states.index(self.state)
 
@@ -670,8 +678,19 @@ class MPC(Node):
                     current_index + 1
                 ]  # state update (driving -> mission)
                 self.waypoints = self.file_open_with_id(self.state.name)  # path update
+
+                self.waypoints_next = self.file_open_with_id(
+                    states[current_index + 2].name
+                )
+
                 self.waypoints = np.array(self.waypoints)
-                self.waypoints[3, :] = self.waypoints[3, :] / 3.6
+                self.waypoints_next = np.array(self.waypoints_next)
+
+                self.waypoints_merge = np.concatenate(
+                    (self.waypoints, self.waypoints_next), axis=1
+                )
+
+                self.waypoints_merge[3, :] = self.waypoints_merge[3, :] / 3.6
                 self.reset_ws = True
             except IndexError:
                 print("index out of range")
@@ -868,8 +887,10 @@ class MPC(Node):
         self.vis_waypoints_msg.scale.x = 0.05
         self.vis_waypoints_msg.scale.y = 0.05
         self.vis_waypoints_msg.id = 0
-        for i in range(self.waypoints.shape[0]):
-            point = Point(x=self.waypoints[i, 0], y=self.waypoints[i, 1], z=0.1)
+        for i in range(self.waypoints_merge.shape[0]):
+            point = Point(
+                x=self.waypoints_merge[i, 0], y=self.waypoints_merge[i, 1], z=0.1
+            )
             self.vis_waypoints_msg.points.append(point)
 
         self.vis_waypoints_pub.publish(self.vis_waypoints_msg)
@@ -908,7 +929,7 @@ class MPC(Node):
 
 
 def main(args=None):
-    file_name = "mpc_test_0520.db"
+    file_name = "bsbs_new.db"
     db = DB(file_name)
 
     rclpy.init(args=args)
