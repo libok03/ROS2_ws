@@ -84,18 +84,18 @@ class mpc_config:
     Rk: list = field(
         # default_factory=lambda: np.diag([0.01, 100.0])
         # default_factory=lambda: np.diag([0.5, 70.0])
-        default_factory=lambda: np.diag([0.5, 50.0])
+        default_factory=lambda: np.diag([0.864, 312.272])
     )  # input cost matrix, penalty for inputs - [accel, steering_speed]
     Rdk: list = field(
         # default_factory=lambda: np.diag([0.01, 100.0])
-        default_factory=lambda: np.diag([0.5, 100.0])
+        default_factory=lambda: np.diag([1.0985,  1166.4])
     )  # input difference cost matrix, penalty for change of inputs - [accel, steering_speed]
     Qk: list = field(
-        default_factory=lambda: np.diag([12.0, 12.0, 20.0, 30.0])  # levine sim
+        default_factory=lambda: np.diag([24.7936, 31.2948, 160, 79.0219])  # levine sim
         # default_factory=lambda: np.diag([50., 50., 5.5, 13.0])
     )  # state error cost matrix, for the the next (T) prediction time steps [x, y, delta, v, yaw, yaw-rate, beta]
     Qfk: list = field(
-        default_factory=lambda: np.diag([18.0, 18.0, 30.0, 40.0])  # levine sim
+        default_factory=lambda: np.diag([27.648, 27.648, 39.93, 53.24])  # levine sim
         # (x, y, v, yaw)
         # default_factory=lambda: np.diag([50., 50., 5.5, 13.0])
     )  # final state error matrix, penalty  for the final state constraints: [x, y, delta, v, yaw, yaw-rate, beta]
@@ -129,7 +129,7 @@ class mpc_config:
     WB: float = 1.040  # Wheelbase [m]
     MIN_STEER: float = -0.4189  # maximum steering angle [rad]
     MAX_STEER: float = 0.4189  # maximum steering angle [rad] # expand
-    MAX_DSTEER = np.deg2rad(30.0)  # 1.05 rad/s
+    MAX_DSTEER = np.deg2rad(15.0)  # 1.05 rad/s
     # MAX_STEER_V: float = 3.2  # maximum steering speed [rad/s]
     MAX_SPEED: float = 8.0  # maximum speed [m/s] ~ 5.0 for levine sim
     MIN_SPEED: float = -2.0  # minimum backward speed [m/s]
@@ -634,7 +634,7 @@ class MPC(Node):
         # travel  = abs(state.v) * self.config.DTK
         # dind = travel / self.config.dlk
         # dind = int(np.clip(round(travel / self.config.dlk) + 1, 1, MAX_DIND))
-        dind = 6
+        dind = int(np.clip(round(state.v * 3.6 / 2) + 1, 1, 20))
         # dind = int(np.clip(state.v +1, 3, 5))
         # self.get_logger().info(f"travel : {dind}")
 

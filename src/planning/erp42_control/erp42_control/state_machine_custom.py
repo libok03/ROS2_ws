@@ -145,7 +145,7 @@ class State(Enum):
     A7A8 = "driving_g"
     A8A9 = "obstacle_h"
     A9A10 = "curve_i"
-    A10A11 = "Traffic_light_j"
+    A10A11 = "traffic_light_j"
     # A10A11 = "driving_j"
     A11A12 = "driving_k"
     A12A13 = "stop_line_l"
@@ -326,8 +326,8 @@ class StateMachine():
         elif self.state.value[:-2] == "delivery":
             msg, self.mission_finish = self.delivery.control_delivery(self.odometry, self.abs_var, self.path)  # abs_var 설정, A1 = 1, A2 = 2, A3 = 3, B1 = 4, B2 = 5, B3 = 6 으로 픽업에서 들어오는값의 +3으로 계산되어 나옴
 
-        # elif self.state.value[:-2] == "traffic_light":
-        #     msg, self.mission_finish = self.traffic_light.control_traffic_light(self.odometry, self.path)
+        elif self.state.value[:-2] == "traffic_light":
+            msg, self.mission_finish = self.traffic_light.control_traffic_light(self.odometry, self.path)
 
         elif self.state.value[:-2] == "stop_line":
             msg, self.mission_finish = self.stop_line.control_stop_line(self.odometry, self.path)
