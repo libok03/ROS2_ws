@@ -134,41 +134,56 @@ class SpeedSupporter():
 class State(Enum):    
 #kcity 본선 대회용 (final - 1012)
 
-    A1A2 = "driving_a"
-    A2A3 = "pickup_b"
-    A3A4 = "curve_c"
-    A4A5 = "traffic_light_d"
-    # A4A5 = "driving_d"
-    A5A6 = "driving_e"
-    A6A7 = "traffic_light_f"
-    # A6A7 = "driving_f"
-    A7A8 = "driving_g"
-    A8A9 = "obstacle_h"
-    A9A10 = "curve_i"
-    A10A11 = "traffic_light_j"
-    # A10A11 = "driving_j"
-    A11A12 = "driving_k"
-    A12A13 = "stop_line_l"
-    A13A14 = "stop_line_m"
-    A14A15 = "driving_o"
-    A15A16 = "curve_p"
-    A16A17 = "driving_q"
-    A17A18 = "traffic_light_r"
-    # A17A18 = "driving_r"
-    A18A19 = "driving_s"
-    A19A20 = "curve_t"
-    A20A21 = "delivery_u"
-    A21A22 = "traffic_light_v"
-    # A21A22 = "driving_v"
-    A22A23 = "driving_w"
-    A23A24 = "traffic_light_x"
-    # A23A24 = "driving_x"
-    A24A25 = "driving_y"
-    A25A26 = "curve_z"
-    A26A27 = "obstacle_A"
-    A27A28 = "curve_B"
-    A28A29 = "driving_C"
-    A29A30 = "parking_D"
+    A1A2 = "driving_a"  # A1A2
+    A2A3 = "driving_b"
+    A3A4 = "driving_c"  # A1A2
+    A4A5 = "driving_d"
+    A5A6 = "driving_e"  # A1A2
+    A6A7 = "driving_f"
+    A7A8 = "driving_g"  # A1A2
+    A8A9 = "driving_h"
+    A9A10 = "driving_i"  # A1A2
+    A10A11 = "driving_j"
+    A11A12 = "driving_k"  # A1A2
+    A12A13 = "driving_l"
+    A13A14 = "driving_m"  # A1A2
+    A14A15 = "driving_n"
+
+    # A1A2 = "driving_a"
+    # A2A3 = "pickup_b"
+    # A3A4 = "curve_c"
+    # A4A5 = "traffic_light_d"
+    # # A4A5 = "driving_d"
+    # A5A6 = "driving_e"
+    # A6A7 = "traffic_light_f"
+    # # A6A7 = "driving_f"
+    # A7A8 = "driving_g"
+    # A8A9 = "obstacle_h"
+    # A9A10 = "curve_i"
+    # A10A11 = "traffic_light_j"
+    # # A10A11 = "driving_j"
+    # A11A12 = "driving_k"
+    # A12A13 = "stop_line_l"
+    # A13A14 = "stop_line_m"
+    # A14A15 = "driving_o"
+    # A15A16 = "curve_p"
+    # A16A17 = "driving_q"
+    # A17A18 = "traffic_light_r"
+    # # A17A18 = "driving_r"
+    # A18A19 = "driving_s"
+    # A19A20 = "curve_t"
+    # A20A21 = "delivery_u"
+    # A21A22 = "traffic_light_v"
+    # # A21A22 = "driving_v"
+    # A22A23 = "driving_w"
+    # A23A24 = "traffic_light_x"
+    # # A23A24 = "driving_x"
+    # A24A25 = "driving_y"
+    # A25A26 = "curve_z"
+    # A26A27 = "obstacle_A"
+    # A27A28 = "curve_B"
+    # A28A29 = "driving_C"
+    # A29A30 = "parking_D"
     A30A31 = "driving_E"
     
     
@@ -390,7 +405,7 @@ def main():
     node = rclpy.create_node("state_machine_node")
 
     # Declare Params
-    node.declare_parameter("file_name", "bsbs.db") #kcity
+    node.declare_parameter("file_name", "bunsudae_v1.db") #kcity
     # node.declare_parameter("file_name", "global_path.db") #dolge
     # node.declare_parameter("file_name", "good.db") #bunsudae
     node.declare_parameter("odom_topic", "/localization/kinematic_state")

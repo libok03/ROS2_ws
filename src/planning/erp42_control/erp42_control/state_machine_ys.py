@@ -16,7 +16,7 @@ from enum import Enum
 import threading
 
 
-from controller_obstacle_ys import Obstacle
+from controller_obstacle_ys_dbver import Obstacle
 from controller_uturn import Uturn
 from controller_parking_ys import Parking
 
@@ -382,7 +382,7 @@ def main():
 
     # Declare Instance
     db = DB(file_name)
-    state = State.A1A2
+    state = State.A8A9
     path = GetPath(db, state)
     odometry = GetOdometry(node, odom_topic)
     state_machine = StateMachine(node, odometry, path, state)

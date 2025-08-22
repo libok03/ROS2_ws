@@ -176,7 +176,10 @@ class Uturn:
                 c_gain=0.24,
             )
 
-            msg.speed = int(12) * 10
+            target_speed = 12.0
+            adapted_speed = self.ss.adaptSpeed(target_speed, hdr, ctr, min_value=10, max_value=14)
+            speed = self.pid.PIDControl(odometry.v * 3.6, adapted_speed)
+            msg.speed = int(speed) * 10
             msg.steer = int(m.degrees((-1) * steer))
             msg.gear = 2
 
@@ -236,7 +239,11 @@ class Uturn:
                 h_gain=0.5,
                 c_gain=0.24,
             )
-            msg.speed = int(10) * 10
+            
+            target_speed = 10.0
+            adapted_speed = self.ss.adaptSpeed(target_speed, hdr, ctr, min_value=8, max_value=12)
+            speed = self.pid.PIDControl(odometry.v * 3.6, adapted_speed) # speed 조정 (PI control) 
+            msg.speed = int(speed) * 10
             msg.steer = int(m.degrees((-1) * steer))
             msg.gear = 2
 

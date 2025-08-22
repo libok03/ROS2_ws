@@ -20,6 +20,7 @@ setup(
         ("lib/" + package_name, [package_name + "/controller_obstacle.py"]),
         ("lib/" + package_name, [package_name + "/controller_parking_ys.py"]),
         ("lib/" + package_name, [package_name + "/controller_obstacle_ys.py"]),
+        ("lib/" + package_name, [package_name + "/controller_obstacle_ys_dbver.py"]),
         ("lib/" + package_name, [package_name + "/controller_pickup.py"]),
         ("lib/" + package_name, [package_name + "/controller_pickup_mj.py"]),
         ("lib/" + package_name, [package_name + "/controller_parking.py"]),
