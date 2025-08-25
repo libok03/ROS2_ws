@@ -140,7 +140,7 @@ class State(Enum):
     A2A3 = "parking_b"  # 8
     A3A4 = "curve_c"  # 20
     A4A5 = "driving_d"  # 20
-    A5A6 = "driving_e"  # 20
+    A5A6 = "uturn_e"  # 20
     A6A7 = "uturn_f"  # 8
     A7A8 = "driving_g" #20
     A8A9 = "obstacle_g" #10
@@ -382,7 +382,7 @@ def main():
 
     # Declare Instance
     db = DB(file_name)
-    state = State.A8A9
+    state = State.A5A6
     path = GetPath(db, state)
     odometry = GetOdometry(node, odom_topic)
     state_machine = StateMachine(node, odometry, path, state)
