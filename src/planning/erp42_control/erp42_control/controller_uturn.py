@@ -82,7 +82,6 @@ class Uturn:
         self.turn_db  = DB("U-turn.db")
         self.turn_path_template = self.turn_db.read_db_n("Path","x","y","yaw")
         self.turn_path = list(self.turn_path_template)
-        self.out_path = DB("U-turn_OUT.db").read_db_n("Path","x","y","yaw")
 
         # modules
         self.st  = Stanley()
@@ -185,8 +184,10 @@ class Uturn:
         dx = self.odometry.x - p0x
         dy = self.odometry.y - p0y
         self.turn_path = self._translated_turn_path(dx, dy)
-        self.state = Uturn_state.Turn
-        self.node.get_logger().info("[UTURN] → Turn")
+        colides = self.correct_turn()
+        if not colides:
+            self.state = Uturn_state.Turn
+            self.node.get_logger().info("[UTURN] → Turn")
 
     def control_uturn(self, odometry):
         self.odometry = odometry
@@ -239,27 +240,7 @@ class Uturn:
                 self.node.get_logger().warn("[UTURN] collision risk -> back to In")
                 self.state = Uturn_state.In
             elif target_idx >= len(path_x) - 3:
-                self.state = Uturn_state.Out
-
-        elif self.state == Uturn_state.Out:
-            path_x = [p[0] for p in self.out_path]
-            path_y = [p[1] for p in self.out_path]
-            path_yaw = [p[2] for p in self.out_path]
-            self.publish_path_msg(path_x, path_y, path_yaw)
-
-            steer, target_idx, hdr, ctr = self.st.stanley_control(
-                odometry, path_x, path_y, path_yaw, h_gain=0.5, c_gain=0.24
-            )
-
-            target_speed = 10.0
-            adapted_speed = self.ss.adaptSpeed(target_speed, hdr, ctr, min_value=8, max_value=12)
-            speed = self.pid.PIDControl(odometry.v * 3.6, adapted_speed)
-            msg.speed = int(speed) * 10
-            msg.steer = int(m.degrees((-1) * steer))
-            msg.gear = 2
-
-            if target_idx >= len(path_x) - 3:
-                return msg, True
+                return msg, True  # U-turn completed
 
         return msg, False
 

@@ -11,6 +11,7 @@ find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(erp42_msgs REQUIRED)
 
 find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
@@ -25,6 +26,7 @@ ament_target_dependencies(rotate_yaw
   rclcpp
   std_msgs
   sensor_msgs
+  erp42_msgs
   nav_msgs
   geometry_msgs
   tf2
@@ -40,6 +42,7 @@ ament_target_dependencies(gps_dummy
   rclcpp
   std_msgs
   sensor_msgs
+  erp42_msgs
   nav_msgs
   geometry_msgs
 )

@@ -91,7 +91,7 @@ class Trafficlight:
         # 🔒 빨간불 래치: 초록이 뜨기 전까지 None이어도 정지 유지
         self.must_wait_green = False
         self.red_hold_start_ts = 0.0
-        self.red_hold_timeout_s = float(node.declare_parameter("/traffic/red_hold_timeout_s", 60.0).value)
+        self.red_hold_timeout_s = float(node.declare_parameter("/traffic/red_hold_timeout_s", 10.0).value)
 
         self.mission_finish = False
         self.start_code = True

@@ -12,7 +12,6 @@ setup(
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
         ("lib/" + package_name, [package_name + "/stanley.py"]),
-        ("lib/" + package_name, [package_name + "/stanley_cone.py"]),
         ("lib/" + package_name, [package_name + "/DB.py"]),
         ("lib/" + package_name, [package_name + "/state_machine.py"]),
         ("lib/" + package_name, [package_name + "/mpc_node.py"]),

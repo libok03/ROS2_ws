@@ -382,7 +382,7 @@ def main():
 
     # Declare Instance
     db = DB(file_name)
-    state = State.A5A6
+    state = State.A6A7
     path = GetPath(db, state)
     odometry = GetOdometry(node, odom_topic)
     state_machine = StateMachine(node, odometry, path, state)
